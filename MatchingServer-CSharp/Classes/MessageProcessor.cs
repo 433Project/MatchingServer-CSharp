@@ -4,13 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MatchingServer_CSharp
+namespace MatchingServer_CSharp.Classes
 {
-    class Program
+    class MessageProcessor
     {
-        static void Main(string[] args)
-        {
-
-        }
     }
 }

@@ -43,6 +43,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes\ConnectionManager.cs" />
+    <Compile Include="Classes\MatchManager.cs" />
+    <Compile Include="Classes\MessageProcessor.cs" />
+    <Compile Include="Classes\MetricGenerator.cs" />
+    <Compile Include="Classes\PlayerManager.cs" />
+    <Compile Include="Classes\ServerManager.cs" />
+    <Compile Include="Classes\WaitingRoom.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
