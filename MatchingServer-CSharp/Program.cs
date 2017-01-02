@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MatchingServer_CSharp.Classes;
 
 namespace MatchingServer_CSharp
 {
@@ -10,7 +11,11 @@ namespace MatchingServer_CSharp
     {
         static void Main(string[] args)
         {
+            ServerManager serverManager = new ServerManager();
 
+            serverManager.Initialize();
+
+            Console.ReadKey();
         }
     }
 }

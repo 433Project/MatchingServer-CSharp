@@ -1,13 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace MatchingServer_CSharp.Classes
 {
     class ServerManager
     {
+        //###########################################
+        //             Fields/Properties
+        //###########################################
+        private Logs logs;
+        private ConnectionManager connectionManager;
+
+        //Properties
+        public bool IsInitialized { get; private set; } = false;
+
+
         //###########################################
         //              Public Methods
         //###########################################
@@ -20,6 +32,14 @@ namespace MatchingServer_CSharp.Classes
         /// <returns>This method returns true if the program was started without fail and false if a critical initialization component failed.</returns>
         public bool Initialize ()
         {
+            Debug.Assert(!IsInitialized, "ServerManager already initialized.");
+
+            logs = new Logs();
+            logs.ReportMessage("ServerManager initializing. . .");
+
+            connectionManager = new ConnectionManager();
+
+            IsInitialized = true;
             return false;
         }
 

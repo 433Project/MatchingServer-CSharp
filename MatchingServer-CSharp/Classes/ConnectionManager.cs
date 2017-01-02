@@ -20,6 +20,13 @@ namespace MatchingServer_CSharp.Classes
 
     class ConnectionManager
     {
+        //###########################################
+        //             Fields/Properties
+        //###########################################
+        private Logs logs;
+
+        //Properties
+        public bool IsInitialized { get; private set; } = false;
 
 
         //###########################################
