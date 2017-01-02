@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ConnectionInformation>
+  <ConfigServer>
+    <ip>10.100.10.6</ip>
+    <port>14040</port>
+  </ConfigServer>
+  <ConnectionServer>
+    <ip>10.100.10.6</ip>
+    <port>8433</port>
+  </ConnectionServer>
+  <MatchingServers>
+    <port>12000</port>
+  </MatchingServers>
+  <Clients>
+    <port>9992</port>
+  </Clients>
+</ConnectionInformation>

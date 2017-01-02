@@ -5,6 +5,8 @@ using System.Net.Sockets;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Diagnostics;
+using System.IO;
 
 namespace MatchingServer_CSharp.Classes
 {
@@ -29,9 +31,26 @@ namespace MatchingServer_CSharp.Classes
         public bool IsInitialized { get; private set; } = false;
 
 
+
         //###########################################
         //              Public Methods
         //###########################################
+
+        /// <summary>
+        /// Initializes the ConnectionManager by creating a logger and reading a configuration file.
+        /// </summary>
+        /// <returns>Returns true upon successful initialization and false otherwise.</returns>
+        public bool Initialize ()
+        {
+            Debug.Assert(!IsInitialized, "ConnectionManager already initialized. Cannot initialize again.");
+
+            logs = new Logs();
+            logs.ReportMessage("ConnectionManager initializing. . .");
+
+            IsInitialized = true;
+            return true;
+        }
+
 
         /// <summary>
         /// Creates a new connection of a specified type with a specified address.
@@ -41,6 +60,8 @@ namespace MatchingServer_CSharp.Classes
         /// <returns>The method returns true on success and false on failure.</returns>
         public bool CreateNewConnection(ConnectionType connectionType, IPAddress address)
         {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call CreateNewConnection.");
+
             return false;
         }
 
@@ -52,6 +73,8 @@ namespace MatchingServer_CSharp.Classes
         /// <returns>The method returns true on success and false on failure to create and initialize the new listening socket.</returns>
         public bool CreateListeningSocket (ConnectionType connectionType)
         {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call CreateListeningSocket.");
+
             return false;
         }
 
@@ -63,6 +86,8 @@ namespace MatchingServer_CSharp.Classes
         /// <param name="connectionID">An out parameter to retrieve the ID of the new connection.</param>
         public void AcceptNewConnection (ConnectionType connectionType, out string connectionID)
         {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call AcceptNewConnection.");
+
             connectionID = "";
         }
 
@@ -76,6 +101,8 @@ namespace MatchingServer_CSharp.Classes
         /// <returns>The method returns true on success and false on failure.</returns>
         public bool SendMessage (ConnectionType connectionType, string sendToID, byte[] message)
         {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call SendMessage.");
+
             return false;
         }
 
@@ -90,6 +117,8 @@ namespace MatchingServer_CSharp.Classes
         /// <returns>The method returns true on success and false on failure.</returns>
         public bool ReceiveMessage (ConnectionType connectionType, string receiveFromID, out byte[] message)
         {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ReceiveMessage.");
+
             message = null;
             return false;
         }
@@ -104,6 +133,8 @@ namespace MatchingServer_CSharp.Classes
         /// <returns>The method returns true on success and false on failure.</returns>
         public bool BroadcastMessage (ConnectionType connectionType, byte[] message)
         {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call BroadcastMessage.");
+
             return false;
         }
 
@@ -116,6 +147,8 @@ namespace MatchingServer_CSharp.Classes
         /// <returns>The method returns true if the connection is healthy and false the connection is unresponsive.</returns>
         public bool CheckConnectionHealth (ConnectionType connectionType, string connectionID)
         {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call CheckConnectionHealth.");
+
             return false;
         }
 
@@ -127,11 +160,16 @@ namespace MatchingServer_CSharp.Classes
         /// <param name="connectionID">ID of the peer to disconnect with. This ID should exist with the context of the connectionType.</param>
         public void Disconnect (ConnectionType connectionType, string connectionID)
         {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call Disconnect.");
 
         }
+
+
 
         //###########################################
         //              Private Methods
         //###########################################
+
+ 
     }
 }

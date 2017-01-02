@@ -32,12 +32,22 @@ namespace MatchingServer_CSharp.Classes
         /// <returns>This method returns true if the program was started without fail and false if a critical initialization component failed.</returns>
         public bool Initialize ()
         {
-            Debug.Assert(!IsInitialized, "ServerManager already initialized.");
+            Debug.Assert(!IsInitialized, "ServerManager already initialized. Cannot initialize again.");
 
             logs = new Logs();
             logs.ReportMessage("ServerManager initializing. . .");
 
             connectionManager = new ConnectionManager();
+            
+            connectionManager.Initialize();
+
+            IPEndPoint configServerEndPoint = null;
+            if (!ConfigReader.GetIPEndPoint("ConfigSerwefwwef", out configServerEndPoint))
+            {
+                logs.ReportError("ServerManager.Initialize: Cannot retrieve ConfigServer IPEndPoint");
+                return false;
+            }
+            //connectionManager.CreateNewConnection (ConnectionType.ConfigServer, )
 
             IsInitialized = true;
             return false;

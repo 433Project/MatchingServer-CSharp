@@ -13,6 +13,8 @@ namespace MatchingServer_CSharp
         {
             ServerManager serverManager = new ServerManager();
 
+            ConfigReader.Initialize();
+
             serverManager.Initialize();
 
             Console.ReadKey();
