@@ -56,6 +56,17 @@
     <Compile Include="Classes\PlayerManager.cs" />
     <Compile Include="Classes\ServerManager.cs" />
     <Compile Include="Classes\WaitingRoom.cs" />
+    <Compile Include="FB Schemes\Body.cs" />
+    <Compile Include="FB Schemes\Command.cs" />
+    <Compile Include="FB Schemes\Status.cs" />
+    <Compile Include="FlatBuffers\ByteBuffer.cs" />
+    <Compile Include="FlatBuffers\FlatBufferBuilder.cs" />
+    <Compile Include="FlatBuffers\FlatBufferConstants.cs" />
+    <Compile Include="FlatBuffers\IFlatbufferObject.cs" />
+    <Compile Include="FlatBuffers\Offset.cs" />
+    <Compile Include="FlatBuffers\Properties\AssemblyInfo.cs" />
+    <Compile Include="FlatBuffers\Struct.cs" />
+    <Compile Include="FlatBuffers\Table.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -63,6 +74,9 @@
     <None Include="App.config" />
     <None Include="NLog.config" />
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="FlatBuffers\FlatBuffers.csproj" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
