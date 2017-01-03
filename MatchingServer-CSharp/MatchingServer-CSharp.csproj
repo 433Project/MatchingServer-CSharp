@@ -64,7 +64,6 @@
     <Compile Include="FlatBuffers\FlatBufferConstants.cs" />
     <Compile Include="FlatBuffers\IFlatbufferObject.cs" />
     <Compile Include="FlatBuffers\Offset.cs" />
-    <Compile Include="FlatBuffers\Properties\AssemblyInfo.cs" />
     <Compile Include="FlatBuffers\Struct.cs" />
     <Compile Include="FlatBuffers\Table.cs" />
     <Compile Include="Program.cs" />
