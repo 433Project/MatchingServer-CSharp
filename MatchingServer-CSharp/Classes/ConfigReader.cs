@@ -17,10 +17,6 @@ namespace MatchingServer_CSharp.Classes
         //###########################################
         private static Logs logs;
 
-        private IPEndPoint configServerEndPoint, connectionServerEndPoint;
-        private IPAddress configServerIP, connectionServerIP;
-        private int configServerPort, connectionServerPort, matchingServerPort, clientPort;
-
         //Properties
         public bool IsInitialized { get; private set; } = false;
 
@@ -30,12 +26,22 @@ namespace MatchingServer_CSharp.Classes
         //              Public Methods
         //###########################################
 
+        /// <summary>
+        /// This method initializes the ConfigReader class by creating it's Logs class instance.
+        /// </summary>
         public static void Initialize ()
         {
             logs = new Logs();
-            logs.ReportMessage("ConnectionManager initializing. . .");
+            logs.ReportMessage("ConfigReader initializing. . .");
         }
 
+
+        /// <summary>
+        /// This method retrieves the IPEndPoint of a connection entry in the network.xml configuration file.
+        /// </summary>
+        /// <param name="xmlNodeName">The name of the connection node (ConfigServer, ConnectionServer).</param>
+        /// <param name="endPoint">An out parameter that holds the IP endpoint contained in the configuration file.</param>
+        /// <returns>Returns true upon a successful read and false if the data could not be obtained.</returns>
         public static bool GetIPEndPoint (string xmlNodeName, out IPEndPoint endPoint)
         {
             endPoint = null;
@@ -50,12 +56,13 @@ namespace MatchingServer_CSharp.Classes
                     logs.ReportError("GetIPEndPoint cannot find node <" + xmlNodeName + ">");
                     return false;
                 }
-                if (!xmlTextReader.ReadToFollowing("ip"))
+                if (!xmlTextReader.ReadToDescendant("ip"))
                 {
                     logs.ReportError("GetIPEndPoint cannot find child node <ip> within node <" + xmlNodeName + ">");
                     return false;
                 }
                 IPAddress address;
+                xmlTextReader.Read();
                 if (!IPAddress.TryParse (xmlTextReader.Value, out address))
                 {
                     logs.ReportError("GetIPEndPoint cannot parse ip value within node <" + xmlNodeName + ">");
@@ -66,7 +73,8 @@ namespace MatchingServer_CSharp.Classes
                     logs.ReportError("GetIPEndPoint cannot find child node <port> within node <" + xmlNodeName + ">");
                     return false;
                 }
-                int port; 
+                int port;
+                xmlTextReader.Read();
                 if (!int.TryParse(xmlTextReader.Value, out port))
                 {
                     logs.ReportError("GetIPEndPoint cannot parse port value within node <" + xmlNodeName + ">");
@@ -87,7 +95,6 @@ namespace MatchingServer_CSharp.Classes
             }
             catch (Exception e)
             {
-
                 logs.ReportError("GetIPEndPoint: " + e.Message);
                 return false;
             }
@@ -95,135 +102,6 @@ namespace MatchingServer_CSharp.Classes
             return true;
         }
 
-        /// <summary>
-        /// This method reads a configuration XML file to obtain critical IP/port information required for connections.
-        /// </summary>
-        /// <returns>Returns true on successful loading and false on failure.</returns>
-        private bool LoadConfiguration()
-        {
-            XmlDocument xmlDocument = new XmlDocument();
-
-            try
-            {
-                xmlDocument.Load("network.xml");
-
-
-                //Get ConfigServer Settings
-                XmlNode serverNode = xmlDocument.DocumentElement.SelectSingleNode("ConfigServer");
-                if (serverNode == null)
-                {
-                    logs.ReportError("LoadConfiguration cannot find node <ConfigServer>");
-                    return false;
-                }
-                XmlNode childNode = serverNode.SelectSingleNode("ip");
-                if (childNode == null)
-                {
-                    logs.ReportError("LoadConfiguration cannot find child node <ip> within node <ConfigServer>");
-                    return false;
-                }
-                if (!IPAddress.TryParse(childNode.Value, out configServerIP))
-                {
-                    logs.ReportError("LoadConfiguration cannot parse ConfigServer ip address");
-                    return false;
-                }
-                childNode = serverNode.SelectSingleNode("port");
-                if (childNode == null)
-                {
-                    logs.ReportError("LoadConfiguration cannot find child node <port> within node <ConfigServer>");
-                    return false;
-                }
-                if (!int.TryParse(childNode.Value, out configServerPort))
-                {
-                    logs.ReportError("LoadConfiguration cannot parse ConfigServer port number");
-                    return false;
-                }
-
-
-                //Get ConnectionServer Settings
-                serverNode = xmlDocument.DocumentElement.SelectSingleNode("ConnectionServer");
-                if (serverNode == null)
-                {
-                    logs.ReportError("LoadConfiguration cannot find node <ConnectionServer>");
-                    return false;
-                }
-                childNode = serverNode.SelectSingleNode("ip");
-                if (childNode == null)
-                {
-                    logs.ReportError("LoadConfiguration cannot find child node <ip> within node <ConnectionServer>");
-                    return false;
-                }
-                if (!IPAddress.TryParse(childNode.Value, out connectionServerIP))
-                {
-                    logs.ReportError("LoadConfiguration cannot parse ConnectionServer ip address");
-                    return false;
-                }
-                childNode = serverNode.SelectSingleNode("port");
-                if (childNode == null)
-                {
-                    logs.ReportError("LoadConfiguration cannot find child node <port> within node <ConnectionServer>");
-                    return false;
-                }
-                if (!int.TryParse(childNode.Value, out connectionServerPort))
-                {
-                    logs.ReportError("LoadConfiguration cannot parse ConnectionServer port number");
-                    return false;
-                }
-
-
-                //Get MatchingServer Listening Port Settings
-                serverNode = xmlDocument.DocumentElement.SelectSingleNode("MatchingServers");
-                if (serverNode == null)
-                {
-                    logs.ReportError("LoadConfiguration cannot find node <MatchingServers>");
-                    return false;
-                }
-                childNode = serverNode.SelectSingleNode("port");
-                if (childNode == null)
-                {
-                    logs.ReportError("LoadConfiguration cannot find child node <port> within node <MatchingServers>");
-                    return false;
-                }
-                if (!int.TryParse(childNode.Value, out matchingServerPort))
-                {
-                    logs.ReportError("LoadConfiguration cannot parse MatchingServers port number");
-                    return false;
-                }
-
-
-                //Get Client Listening Port Settings
-                serverNode = xmlDocument.DocumentElement.SelectSingleNode("Clients");
-                if (serverNode == null)
-                {
-                    logs.ReportError("LoadConfiguration cannot find node <Clients>");
-                    return false;
-                }
-                childNode = serverNode.SelectSingleNode("port");
-                if (childNode == null)
-                {
-                    logs.ReportError("LoadConfiguration cannot find child node <port> within node <Clients>");
-                    return false;
-                }
-                if (!int.TryParse(childNode.Value, out clientPort))
-                {
-                    logs.ReportError("LoadConfiguration cannot parse Clients port number");
-                    return false;
-                }
-            }
-            catch (FileNotFoundException e)
-            {
-                logs.ReportError("LoadConfiguration cannot find XML-file ...\\network.xml");
-            }
-            catch (XmlException e)
-            {
-                logs.ReportError("LoadConfiguration: " + e.Message);
-            }
-            catch (Exception e)
-            {
-                logs.ReportError("LoadConfiguration: " + e.Message);
-            }
-
-            return true;
-        }
 
         //###########################################
         //              Private Methods

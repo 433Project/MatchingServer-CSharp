@@ -38,19 +38,45 @@ namespace MatchingServer_CSharp.Classes
             logs.ReportMessage("ServerManager initializing. . .");
 
             connectionManager = new ConnectionManager();
-            
             connectionManager.Initialize();
 
+            // 1. Connect with ConfigServer
             IPEndPoint configServerEndPoint = null;
-            if (!ConfigReader.GetIPEndPoint("ConfigSerwefwwef", out configServerEndPoint))
+            if (!ConfigReader.GetIPEndPoint("ConfigServer", out configServerEndPoint))
             {
                 logs.ReportError("ServerManager.Initialize: Cannot retrieve ConfigServer IPEndPoint");
                 return false;
             }
-            //connectionManager.CreateNewConnection (ConnectionType.ConfigServer, )
+
+            int i = 0;
+            while (!connectionManager.CreateNewConnection(ConnectionType.ConfigServer, configServerEndPoint))
+            {
+                if (i++ == 1000)
+                {
+                    logs.ReportError("ServerManager.Initialize: Could not connect with ConfigServer");
+                    return false;
+                }
+            }
+            logs.ReportMessage("ServerManager.Initialize: Successfully connected to ConfigServer IP: " + configServerEndPoint.Address.ToString() + ":" + configServerEndPoint.Port);
+
+
+            // 2. Register with ConfigServer
+
+
+            // 3. Create ConfigServer async service loop
+
+
+            // 4. Create MatchingServer async service loop
+
+
+            // 5. Initialize PlayerManager
+
+
+            // 6. Initialize MatchingManager
+
 
             IsInitialized = true;
-            return false;
+            return true;
         }
 
 
