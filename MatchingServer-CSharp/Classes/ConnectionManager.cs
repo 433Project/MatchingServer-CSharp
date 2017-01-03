@@ -181,6 +181,27 @@ namespace MatchingServer_CSharp.Classes
         public bool SendMessage (ConnectionType connectionType, string sendToID, byte[] message)
         {
             Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call SendMessage.");
+            Debug.Assert(message.Length > 0, "Empty message sent to ConnectionManager. Cannot call SendMessage.");
+
+            switch (connectionType)
+            {
+                case ConnectionType.ConfigServer:
+                    return SendMessageToConfigServerSync(message);
+
+                case ConnectionType.MatchingServer:
+                    break;
+
+                case ConnectionType.ConnectionServer:
+                    break;
+
+                case ConnectionType.Client:
+                    break;
+
+                default:
+                    logs.ReportError("SendMessage: Invalid ConnectionType specified.");
+                    return false;
+
+            }
 
             return false;
         }
@@ -258,6 +279,33 @@ namespace MatchingServer_CSharp.Classes
         //              Private Methods
         //###########################################
 
- 
+        
+        /// <summary>
+        /// This method sends a message synchronously to the configuration server.
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        private bool SendMessageToConfigServerSync (byte[] message)
+        {
+            Debug.Assert(configServerSocket != null, "Cannot call SendMessageToConfigServerSync if configServerSocket is null!");
+
+            try
+            {
+                configServerSocket.Send(message);
+            }
+            catch (SocketException e)
+            {
+                logs.ReportError("SendMessageToConfigServerSync: SocketException during Socket.Send() - Message: " + e.Message);
+                configServerSocket.Close();
+                return false;
+            }
+            catch (Exception e)
+            {
+                logs.ReportError("SendMessageToConfigServerSync: Exception during Socket.Send() - Message: " + e.Message);
+                return false;
+            }
+
+            return true;
+        }
     }
 }

@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using FlatBuffers;
+using fb;
 
 namespace MatchingServer_CSharp.Classes
 {
@@ -59,9 +61,25 @@ namespace MatchingServer_CSharp.Classes
             }
             logs.ReportMessage("ServerManager.Initialize: Successfully connected to ConfigServer IP: " + configServerEndPoint.Address.ToString() + ":" + configServerEndPoint.Port);
 
+            logs.ReportMessage("Packaged Message");
+
 
             // 2. Register with ConfigServer
+            logs.ReportMessage("Packaged Message");
+            var messageBuilder = new FlatBufferBuilder(256);
+            logs.ReportMessage("Packaged Message");
+            var body = Body.CreateBody(messageBuilder, COMMAND.MS_ID_REQUEST, STATUS.NONE);
+            logs.ReportMessage("Packaged Message");
+            messageBuilder.Finish(body.Value);
+            logs.ReportMessage("Packaged Message");
+            byte[] message = messageBuilder.SizedByteArray();
+            logs.ReportMessage("Packaged Message");
 
+            if (!connectionManager.SendMessage(ConnectionType.ConfigServer, "", message))
+            {
+                logs.ReportError("SendMessageToConfigServerSync: Could not send message to config server");
+            }
+            logs.ReportMessage("SendMessageToConfigServerSync: Sent message to config server");
 
             // 3. Create ConfigServer async service loop
 
