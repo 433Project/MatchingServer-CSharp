@@ -24,7 +24,7 @@ namespace MatchingServer_CSharp.Classes
         }
 
         /// <summary>
-        /// Sends and error to be logged by our logger.
+        /// Sends an error to be logged by our logger.
         /// </summary>
         /// <param name="errorMessage">A string containing the error message.</param>
         public void ReportError (string errorMessage)
