@@ -43,6 +43,9 @@ namespace MatchingServer_CSharp.Classes
 
             connectionManager = new ConnectionManager();
             connectionManager.Initialize();
+            messageProcessor = new MessageProcessor();
+            messageProcessor.Initialize();
+
 
             // 1. Connect with ConfigServer
             IPEndPoint configServerEndPoint = null;
@@ -65,8 +68,6 @@ namespace MatchingServer_CSharp.Classes
 
 
             // 2. Register with ConfigServer
-            messageProcessor = new MessageProcessor();
-            messageProcessor.Initialize();
             byte[] message;
             messageProcessor.PackMessage(
                 new Header(0, TerminalType.MatchingServer, 0, TerminalType.ConfigServer, 0),
@@ -76,11 +77,32 @@ namespace MatchingServer_CSharp.Classes
                 "",
                 out message);
 
-            if (!connectionManager.SendMessage(ConnectionType.ConfigServer, "", message))
+            if (!connectionManager.SendMessageToConfigServerSync(message))
             {
-                logs.ReportError("SendMessageToConfigServerSync: Could not send message to config server");
+                logs.ReportError("SendMessageToConfigServerSync: Could not send message to ConfigServer");
             }
-            logs.ReportMessage("SendMessageToConfigServerSync: Sent message to config server");
+            logs.ReportMessage("SendMessageToConfigServerSync: Sent message to ConfigServer");
+
+            if (!connectionManager.ReceiveMessageFromConfigServerSync(out message))
+            {
+                logs.ReportError("ReceiveMessageFromConfigServerSync: Could not receive message from ConfigServer");
+            }
+            logs.ReportMessage("ReceiveMessageFromConfigServerSync: Received message from ConfigServer");
+
+            Packet packet;
+            messageProcessor.UnPackMessage(message, out packet);
+            logs.ReportMessage("Message Data: [Length] " + packet.header.length
+                + " [SrcType] " + packet.header.srcType
+                + " [SrcCode] " + packet.header.srcCode
+                + " [DstType] " + packet.header.dstType
+                + " [DstCode] " + packet.header.dstCode
+                + " [Command] " + packet.body.Cmd
+                + " [Status] " + packet.body.status
+                + " [Data1] " + packet.body.Data1
+                + " [Data2] " + packet.body.Data2
+                );
+
+
 
 
             // 3. Create ConfigServer async service loop

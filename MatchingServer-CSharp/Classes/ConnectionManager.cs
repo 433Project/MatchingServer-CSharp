@@ -208,6 +208,38 @@ namespace MatchingServer_CSharp.Classes
 
 
         /// <summary>
+        /// This method sends a message synchronously to the configuration server.
+        /// </summary>
+        /// <param name="message">A byte[] of the message to be sent.</param>
+        /// <returns>Returns true on a successful send or false on error.</returns>
+        public bool SendMessageToConfigServerSync(byte[] message)
+        {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call SendMessageToConfigServerSync.");
+            Debug.Assert(configServerSocket != null, "Cannot call SendMessageToConfigServerSync if configServerSocket is null!");
+            Debug.Assert(message.Length >= 20, "Cannot call SendMessageToConfigServerSync if message is smaller than minimum header size!");
+
+            try
+            {
+                int bytesSent = configServerSocket.Send(message);
+                logs.ReportMessage("SendMessageToConfigServerSync: Sent " + bytesSent + " bytes");
+            }
+            catch (SocketException e)
+            {
+                logs.ReportError("SendMessageToConfigServerSync: SocketException during Socket.Send() - Message: " + e.Message);
+                configServerSocket.Close();
+                return false;
+            }
+            catch (Exception e)
+            {
+                logs.ReportError("SendMessageToConfigServerSync: Exception during Socket.Send() - Message: " + e.Message);
+                return false;
+            }
+
+            return true;
+        }
+
+
+        /// <summary>
         /// Looks up the socket from the ID and awaits the receipt of a message on that socket. 
         /// The message is passed as an out parameter. Failure informs the caller that the connection with the ID is no longer viable.
         /// </summary>
@@ -218,9 +250,54 @@ namespace MatchingServer_CSharp.Classes
         public bool ReceiveMessage (ConnectionType connectionType, string receiveFromID, out byte[] message)
         {
             Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ReceiveMessage.");
+            Debug.Assert(receiveFromID != null, "ConnectionManager.ReceiveMessage: receiveFromID is null");
 
             message = null;
+
+
+
+
             return false;
+        }
+
+
+        /// <summary>
+        /// This method receives a message synchronously from the configuration server.
+        /// </summary>
+        /// <param name="message">A byte[] out parameter of the message to be collected.</param>
+        /// <returns>Returns true on a successful send or false on error.</returns>
+        public bool ReceiveMessageFromConfigServerSync(out byte[] message)
+        {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ReceiveMessageFromConfigServerSync.");
+            Debug.Assert(configServerSocket != null, "Cannot call ReceiveMessageFromConfigServerSync if configServerSocket is null!");
+
+            message = new byte[100];
+
+            try
+            {
+                int bytesReceived = configServerSocket.Receive(message);
+                logs.ReportMessage("ReceiveMessageFromConfigServerSync: Received " + bytesReceived + " bytes");
+
+                if (bytesReceived <= 0)
+                {
+                    logs.ReportError("ReceiveMessageFromConfigServerSync: Erroneous bytes received from ConfigServer; Closing Connection. . .");
+                    configServerSocket.Close();
+                    return false;
+                }
+            }
+            catch (SocketException e)
+            {
+                logs.ReportError("ReceiveMessageFromConfigServerSync: SocketException during Socket.Receive() - Message: " + e.Message);
+                configServerSocket.Close();
+                return false;
+            }
+            catch (Exception e)
+            {
+                logs.ReportError("ReceiveMessageFromConfigServerSync: Exception during Socket.Receive() - Message: " + e.Message);
+                return false;
+            }
+
+            return true;
         }
 
 
@@ -280,32 +357,6 @@ namespace MatchingServer_CSharp.Classes
         //###########################################
 
         
-        /// <summary>
-        /// This method sends a message synchronously to the configuration server.
-        /// </summary>
-        /// <param name="message"></param>
-        /// <returns></returns>
-        private bool SendMessageToConfigServerSync (byte[] message)
-        {
-            Debug.Assert(configServerSocket != null, "Cannot call SendMessageToConfigServerSync if configServerSocket is null!");
 
-            try
-            {
-                configServerSocket.Send(message);
-            }
-            catch (SocketException e)
-            {
-                logs.ReportError("SendMessageToConfigServerSync: SocketException during Socket.Send() - Message: " + e.Message);
-                configServerSocket.Close();
-                return false;
-            }
-            catch (Exception e)
-            {
-                logs.ReportError("SendMessageToConfigServerSync: Exception during Socket.Send() - Message: " + e.Message);
-                return false;
-            }
-
-            return true;
-        }
     }
 }

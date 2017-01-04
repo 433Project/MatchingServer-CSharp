@@ -42,6 +42,8 @@ namespace MatchingServer_CSharp.Classes
 
         public bool PackMessage (Header header, Command command, Status status, string data1, string data2, out byte[] packet)
         {
+            Debug.Assert(IsInitialized, "MessageProcessor is not initialized. Cannot call PackMessage.");
+
             packet = null;
 
             // 1. Build body with FlatBuffer
@@ -60,6 +62,28 @@ namespace MatchingServer_CSharp.Classes
             packet = new byte[headerBytes.Length + message.Length];
             Array.Copy(headerBytes, packet, headerBytes.Length);
             Array.Copy(message, 0, packet, headerBytes.Length, message.Length);
+
+            return true;
+        }
+
+
+        public bool UnPackMessage (byte[] message, out Packet packet)
+        {
+            Debug.Assert(IsInitialized, "MessageProcessor is not initialized. Cannot call UnPackMessage.");
+            Debug.Assert(message != null, "Cannot call UnPackMessage if message is null!");
+            Debug.Assert(message.Length >= 20, "Cannot call UnPackMessage if message is smaller than minimum header size!");
+
+            packet = new Packet ();
+            int headerSize = Marshal.SizeOf(packet.header);
+
+            byte[] header = new byte[headerSize];
+            Array.Copy(message, header, headerSize);
+            packet.header = (Header)ByteToStructure(header, typeof(Header));
+
+            byte[] body = new byte[packet.header.length];
+            Array.Copy(message, headerSize, body, 0, packet.header.length);
+
+            packet.body = Body.GetRootAsBody(new ByteBuffer(body));
 
             return true;
         }
