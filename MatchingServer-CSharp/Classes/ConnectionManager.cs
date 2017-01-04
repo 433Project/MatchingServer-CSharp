@@ -232,6 +232,7 @@ namespace MatchingServer_CSharp.Classes
             catch (Exception e)
             {
                 logs.ReportError("SendMessageToConfigServerSync: Exception during Socket.Send() - Message: " + e.Message);
+                configServerSocket.Close();
                 return false;
             }
 
@@ -294,6 +295,7 @@ namespace MatchingServer_CSharp.Classes
             catch (Exception e)
             {
                 logs.ReportError("ReceiveMessageFromConfigServerSync: Exception during Socket.Receive() - Message: " + e.Message);
+                configServerSocket.Close();
                 return false;
             }
 

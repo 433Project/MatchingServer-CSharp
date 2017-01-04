@@ -22,6 +22,7 @@ namespace MatchingServer_CSharp.Classes
 
         //Properties
         public bool IsInitialized { get; private set; } = false;
+        public string LocalMatchingServerID { get; private set; }
 
 
         //###########################################
@@ -48,61 +49,23 @@ namespace MatchingServer_CSharp.Classes
 
 
             // 1. Connect with ConfigServer
-            IPEndPoint configServerEndPoint = null;
-            if (!ConfigReader.GetIPEndPoint("ConfigServer", out configServerEndPoint))
+            if (!ConnectWithConfigServer(1000))
             {
-                logs.ReportError("ServerManager.Initialize: Cannot retrieve ConfigServer IPEndPoint");
                 return false;
             }
 
-            int i = 0;
-            while (!connectionManager.CreateNewConnection(ConnectionType.ConfigServer, configServerEndPoint))
-            {
-                if (i++ == 1000)
-                {
-                    logs.ReportError("ServerManager.Initialize: Could not connect with ConfigServer");
-                    return false;
-                }
-            }
-            logs.ReportMessage("ServerManager.Initialize: Successfully connected to ConfigServer IP: " + configServerEndPoint.Address.ToString() + ":" + configServerEndPoint.Port);
-
 
             // 2. Register with ConfigServer
-            byte[] message;
-            messageProcessor.PackMessage(
-                new Header(0, TerminalType.MatchingServer, 0, TerminalType.ConfigServer, 0),
-                Command.MatchingServerIDRequest,
-                Status.None,
-                "",
-                "",
-                out message);
+            bool result = GetIDFromConfigServer();
 
-            if (!connectionManager.SendMessageToConfigServerSync(message))
+            while (!result)     // If registration failed (socket issue, reattempt)
             {
-                logs.ReportError("SendMessageToConfigServerSync: Could not send message to ConfigServer");
+                if (!ConnectWithConfigServer(1000))
+                {
+                    return false;
+                }
+                result = GetIDFromConfigServer();
             }
-            logs.ReportMessage("SendMessageToConfigServerSync: Sent message to ConfigServer");
-
-            if (!connectionManager.ReceiveMessageFromConfigServerSync(out message))
-            {
-                logs.ReportError("ReceiveMessageFromConfigServerSync: Could not receive message from ConfigServer");
-            }
-            logs.ReportMessage("ReceiveMessageFromConfigServerSync: Received message from ConfigServer");
-
-            Packet packet;
-            messageProcessor.UnPackMessage(message, out packet);
-            logs.ReportMessage("Message Data: [Length] " + packet.header.length
-                + " [SrcType] " + packet.header.srcType
-                + " [SrcCode] " + packet.header.srcCode
-                + " [DstType] " + packet.header.dstType
-                + " [DstCode] " + packet.header.dstCode
-                + " [Command] " + packet.body.Cmd
-                + " [Status] " + packet.body.status
-                + " [Data1] " + packet.body.Data1
-                + " [Data2] " + packet.body.Data2
-                );
-
-
 
 
             // 3. Create ConfigServer async service loop
@@ -126,6 +89,91 @@ namespace MatchingServer_CSharp.Classes
         //###########################################
         //              Private Methods
         //###########################################
+
+
+        /// <summary>
+        /// This method attempts to connect to the ConfigServer and upon failure, will retry numberOfAttempts number of times (or infinite if 0).
+        /// </summary>
+        /// <param name="numberOfAttempts">The number of attempts to try to connect (infinite if 0).</param>
+        /// <returns>Returns false if it could not connect with the ConfigServer and true upon success.</returns>
+        private bool ConnectWithConfigServer (uint numberOfAttempts)
+        {
+            Debug.Assert(connectionManager != null, "ConnectionManager is null. ServerManager cannot call ConnectWithConfigServer.");
+
+            IPEndPoint configServerEndPoint = null;
+            if (!ConfigReader.GetIPEndPoint("ConfigServer", out configServerEndPoint))
+            {
+                logs.ReportError("ServerManager.ConnectWithConfigServer: Cannot retrieve ConfigServer IPEndPoint");
+                return false;
+            }
+            
+            while (!connectionManager.CreateNewConnection(ConnectionType.ConfigServer, configServerEndPoint))
+            {
+                switch (numberOfAttempts)
+                {
+                    case 0:         // Infinite tries
+                        break;
+                    case 1:
+                        logs.ReportError("ServerManager.ConnectWithConfigServer: Could not connect with ConfigServer");
+                        return false;
+                    default:
+                        --numberOfAttempts;
+                        break;
+                }
+            }
+            logs.ReportMessage("ServerManager.ConnectWithConfigServer: Successfully connected to ConfigServer IP: " + configServerEndPoint.Address.ToString() + ":" + configServerEndPoint.Port);
+
+            return true;
+        }
+
+
+        /// <summary>
+        /// This method synchronously obtains the local MatchingServer ID from the ConfigServer.
+        /// </summary>
+        /// <returns>Returns false if either sending the ID request or receiving the answer failed and true upon successful registration.</returns>
+        private bool GetIDFromConfigServer ()
+        {
+            Debug.Assert(connectionManager != null, "ConnectionManager is null. ServerManager cannot call ConnectWithConfigServer.");
+
+            byte[] message;
+            messageProcessor.PackMessage(
+                new Header(0, TerminalType.MatchingServer, 0, TerminalType.ConfigServer, 0),
+                Command.MatchingServerIDRequest,
+                Status.None,
+                "",
+                "",
+                out message);
+
+            if (!connectionManager.SendMessageToConfigServerSync(message))
+            {
+                logs.ReportError("SendMessageToConfigServerSync: Could not send message to ConfigServer");
+                return false;
+            }
+            logs.ReportMessage("SendMessageToConfigServerSync: Sent message to ConfigServer");
+
+            if (!connectionManager.ReceiveMessageFromConfigServerSync(out message))
+            {
+                logs.ReportError("ReceiveMessageFromConfigServerSync: Could not receive message from ConfigServer");
+                return false;
+            }
+            logs.ReportMessage("ReceiveMessageFromConfigServerSync: Received message from ConfigServer");
+
+            Packet packet;
+            messageProcessor.UnPackMessage(message, out packet);
+            logs.ReportMessage("Message Data: [Length] " + packet.header.length
+                + " [SrcType] " + packet.header.srcType
+                + " [SrcCode] " + packet.header.srcCode
+                + " [DstType] " + packet.header.dstType
+                + " [DstCode] " + packet.header.dstCode
+                + " [Command] " + packet.body.Cmd
+                + " [Status] " + packet.body.status
+                + " [Data1] " + packet.body.Data1
+                + " [Data2] " + packet.body.Data2
+                );
+
+            LocalMatchingServerID = packet.body.Data1;
+            return true;
+        }
 
 
         /// <summary>
