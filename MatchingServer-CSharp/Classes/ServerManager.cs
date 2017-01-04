@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using FlatBuffers;
 using fb;
+using Protocol;
 
 namespace MatchingServer_CSharp.Classes
 {
@@ -17,6 +18,7 @@ namespace MatchingServer_CSharp.Classes
         //###########################################
         private Logs logs;
         private ConnectionManager connectionManager;
+        private MessageProcessor messageProcessor;
 
         //Properties
         public bool IsInitialized { get; private set; } = false;
@@ -63,16 +65,23 @@ namespace MatchingServer_CSharp.Classes
 
 
             // 2. Register with ConfigServer
-            var messageBuilder = new FlatBufferBuilder(256);
-            var body = Body.CreateBody(messageBuilder, COMMAND.MS_ID_REQUEST, STATUS.NONE);
-            messageBuilder.Finish(body.Value);
-            byte[] message = messageBuilder.SizedByteArray();
+            messageProcessor = new MessageProcessor();
+            messageProcessor.Initialize();
+            byte[] message;
+            messageProcessor.PackMessage(
+                new Header(0, TerminalType.MatchingServer, 0, TerminalType.ConfigServer, 0),
+                Command.MatchingServerIDRequest,
+                Status.None,
+                "",
+                "",
+                out message);
 
             if (!connectionManager.SendMessage(ConnectionType.ConfigServer, "", message))
             {
                 logs.ReportError("SendMessageToConfigServerSync: Could not send message to config server");
             }
             logs.ReportMessage("SendMessageToConfigServerSync: Sent message to config server");
+
 
             // 3. Create ConfigServer async service loop
 

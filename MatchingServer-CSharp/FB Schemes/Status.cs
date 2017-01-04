@@ -3,11 +3,12 @@
 namespace fb
 {
 
-public enum STATUS : int
+public enum Status : int
 {
- SUCCESS = 0,
- FAIL = 1,
- NONE = 2,
+    NotSet = 0,
+    Success = 1,
+    Fail = 2,
+    None = 3,
 };
 
 

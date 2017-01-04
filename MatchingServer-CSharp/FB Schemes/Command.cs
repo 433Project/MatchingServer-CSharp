@@ -3,27 +3,28 @@
 namespace fb
 {
 
-public enum COMMAND : int
+public enum Command : int
 {
- HEALTH_CHECK_REQUEST = 0,
- HEALTH_CHECK_RESPONSE = 1,
- NOTI_MATCH_REQUEST = 10,
- NOTI_MATCH_SUCCESS = 11,
- MATCH_REQUEST = 12,
- MATCH_RESPONSE = 13,
- MS_ID_REQUEST = 30,
- MS_ID_RESPONSE = 31,
- MSLIST_REQUEST = 32,
- MSLIST_RESPONSE = 33,
- ROOM_CREATE_REQUEST = 40,
- ROOM_CREATE_RESPONSE = 41,
- ROOM_JOIN_REQUEST = 50,
- ROOM_JOIN_RESPONSE = 51,
- GAME_START = 52,
- GAME_END = 53,
- PG_START = 60,
- PG_END = 61,
- PG_DUMMY = 62,
+    NotSet = 0,
+    HealthCheckRequest = 1,
+    HealthCheckResponse = 2,
+    NotifyMatchRequest = 10,
+    NotifyMatchResponse = 11,
+    MatchRequest = 12,
+    MatchResponse = 13,
+    MatchingServerIDRequest = 30,
+    MatchingServerIDResponse = 31,
+    MatchingServerListRequest = 32,
+    MatchingServerListResponse = 33,
+    RoomCreateRequest = 40,
+    RoomCreateResponse = 41,
+    RoomJoinRequest = 50,
+    RoomJoinResponse = 51,
+    GameStart = 52,
+    GameEnd = 53,
+    PacketGeneratorStart = 60,
+    PacketGeneratorEnd = 61,
+    PacketGeneratorDummy = 62,
 };
 
 
