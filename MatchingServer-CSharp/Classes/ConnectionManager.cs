@@ -116,8 +116,8 @@ namespace MatchingServer_CSharp.Classes
                     break;
 
                 case ConnectionType.ConnectionServer:
-                    Debug.Assert(configServerSocket == null, "ConnectionManager.CreateNewConnection: Already has configured ConnectionServer socket.");
-                    configServerSocket = newSocket;
+                    Debug.Assert(connectionServerSocket == null, "ConnectionManager.CreateNewConnection: Already has configured ConnectionServer socket.");
+                    connectionServerSocket = newSocket;
                     break;
 
                 case ConnectionType.MatchingServer:
@@ -142,6 +142,71 @@ namespace MatchingServer_CSharp.Classes
             }
 
             return true;
+        }
+
+        
+        async public Task<bool> ConnectWithConfigServerAsync (IPEndPoint ipEndPoint)
+        {
+            //Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ConnectWithConfigServerAsync.");
+            //Debug.Assert(configServerSocket == null, "ConnectionManager.ConnectWithConfigServerAsync: Already has configured ConfigServer socket.");
+
+            logs.ReportMessage("ConnectionManager.ConnectWithConfigServerAsync: Making new sockets. . .");
+            // 1. Create new socket
+            Socket newSocket = null;
+            try
+            {
+                newSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            }
+            catch (SocketException e)
+            {
+                logs.ReportError("CreateNewConnection: SocketException during new Socket(...)");
+                return false;
+            }
+            catch (Exception e)
+            {
+                logs.ReportError("CreateNewConnection: " + e.Message);
+                return false;
+            }
+
+            logs.ReportMessage("ConnectionManager.ConnectWithConfigServerAsync: Attempting to reset connection with ConfigServer. . .");
+            // 2. Connect with desired ip end point
+            while (true)
+            {
+                int result = 0;
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        newSocket.Connect(ipEndPoint);
+                        result = 2;
+                    }
+                    catch (SocketException e)
+                    {
+                        logs.ReportError("CreateNewConnection: SocketException during Socket.Connect() - IP: " + ipEndPoint.Address.ToString() + "  Port: " + ipEndPoint.Port + "  Message: " + e.Message);
+                        result = 1;
+                    }
+                    catch (Exception e)
+                    {
+                        logs.ReportError("CreateNewConnection: " + e.Message);
+                        newSocket.Close();
+                        result = 0;
+                    }
+                });
+
+                switch (result)
+                {
+                    case 0:
+                        return false;
+                    case 1:
+                        await Task.Delay(5000);
+                        continue;
+                    case 2:
+                        configServerSocket = newSocket;
+                        return true;
+                    default:
+                        return false;
+                }
+            }
         }
 
 
@@ -266,7 +331,7 @@ namespace MatchingServer_CSharp.Classes
         /// This method receives a message synchronously from the configuration server.
         /// </summary>
         /// <param name="message">A byte[] out parameter of the message to be collected.</param>
-        /// <returns>Returns true on a successful send or false on error.</returns>
+        /// <returns>Returns true on a successful receive or false on error.</returns>
         public bool ReceiveMessageFromConfigServerSync(out byte[] message)
         {
             Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ReceiveMessageFromConfigServerSync.");
@@ -295,6 +360,53 @@ namespace MatchingServer_CSharp.Classes
             catch (Exception e)
             {
                 logs.ReportError("ReceiveMessageFromConfigServerSync: Exception during Socket.Receive() - Message: " + e.Message);
+                configServerSocket.Close();
+                return false;
+            }
+
+            return true;
+        }
+
+
+        /// <summary>
+        /// This method receives a message asynchronously from the configuration server. If the receive resulted in a problem (bytes received), the socket is closed and false is returned.
+        /// </summary>
+        /// <param name="message">A byte[] parameter of the message to be collected.</param>
+        /// <returns>Returns true on a successful receive or false on error.</returns>
+        async public Task<bool> ReceiveMessageFromConfigServerAsync(byte[] message)
+        {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ReceiveMessageFromConfigServerSync.");
+            Debug.Assert(configServerSocket != null, "Cannot call ReceiveMessageFromConfigServerSync if configServerSocket is null!");
+
+            message = new byte[100];
+            int bytesReceived = 0;
+
+            bytesReceived = await Task.Run(() =>
+            {
+                try
+                {
+                    return configServerSocket.Receive(message);
+                }
+                catch (SocketException e)
+                {
+                    logs.ReportError("ReceiveMessageFromConfigServerAsync: SocketException during Socket.Receive() - Message: " + e.Message);
+                    configServerSocket.Close();
+                    return -2;
+                }
+                catch (Exception e)
+                {
+
+                    logs.ReportError("ReceiveMessageFromConfigServerAsync: Exception during Socket.Receive() - Message: " + e.Message);
+                    configServerSocket.Close();
+                    return -2;
+                }
+            });
+
+            logs.ReportMessage("ReceiveMessageFromConfigServerAsync: Received " + bytesReceived + " bytes");
+
+            if (bytesReceived <= 0)
+            {
+                logs.ReportError("ReceiveMessageFromConfigServerAsync: Erroneous bytes received from ConfigServer; Closing Connection. . .");
                 configServerSocket.Close();
                 return false;
             }
@@ -357,8 +469,6 @@ namespace MatchingServer_CSharp.Classes
         //###########################################
         //              Private Methods
         //###########################################
-
         
-
     }
 }

@@ -69,7 +69,7 @@ namespace MatchingServer_CSharp.Classes
 
 
             // 3. Create ConfigServer async service loop
-
+            StartConfigServerLoop();
 
             // 4. Create MatchingServer async service loop
 
@@ -177,11 +177,62 @@ namespace MatchingServer_CSharp.Classes
 
 
         /// <summary>
-        /// Loop asynchronous receive calls to the ConfigServer in order to receive messages from the ConfigServer.
+        /// This method makes a request to the ConfigServer for MatchingServer data, then initiates asynchronous receiving.
         /// </summary>
-        async private void StartConfigServerLoop ()
+        private void StartConfigServerLoop ()
         {
+            // 1. Send request for matching server data
 
+            // 2. Start async loop
+            Task.Run(ConfigServerLoop);
+        }
+
+
+        /// <summary>
+        /// This method loops asynchronous receive calls to the ConfigServer in order to receive messages from the ConfigServer.
+        /// </summary>
+        async Task ConfigServerLoop ()
+        {
+            byte[] message = null;
+            if(!(await connectionManager.ReceiveMessageFromConfigServerAsync(message))) {
+                // Error with connection
+                logs.ReportMessage("ServerManager.ConfigServerLoop: Attempting to reset connection with ConfigServer. . .");
+                Task.Run(ResetConnectionWithConfigServer);
+                return;
+            }
+
+            // Message Received
+
+            // Interpret message
+
+            // Wait for next message
+            Task.Run(ConfigServerLoop);
+        }
+
+
+        /// <summary>
+        /// This method retrieves the ConfigServer endpoint from file and initiates background reconnection with the ConfigServer.
+        ///  Afterwards, the method restarts the ConfigServer loop.
+        /// </summary>
+        async Task ResetConnectionWithConfigServer ()
+        {
+            // 1. Get the ConfigServer end point from XML config
+            IPEndPoint configServerEndPoint = null;
+            if (!ConfigReader.GetIPEndPoint("ConfigServer", out configServerEndPoint))
+            {
+                logs.ReportError("ServerManager.ResetConnectionWithConfigServer: Cannot retrieve ConfigServer IPEndPoint");
+                return;
+            }
+
+            logs.ReportMessage("ServerManager.ResetConnectionWithConfigServer: ReconnectStart");
+            // 2. Initiate a background reconnection attempt
+            if (!(await connectionManager.ConnectWithConfigServerAsync(configServerEndPoint))) {
+                logs.ReportError("ServerManager.ResetConnectionWithConfigServer: Cannot reconnect with ConfigServer");
+                return;
+            }
+
+            // 3. Restart the ConfigServer loop
+            StartConfigServerLoop();
         }
 
 
