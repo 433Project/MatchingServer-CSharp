@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using NLog;
+using Protocol;
 
 namespace MatchingServer_CSharp.Classes
 {
@@ -14,6 +15,7 @@ namespace MatchingServer_CSharp.Classes
     {
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
+
         /// <summary>
         /// Sends a message to be logged by our logger.
         /// </summary>
@@ -22,6 +24,26 @@ namespace MatchingServer_CSharp.Classes
         {
             logger.Info(message);
         }
+
+
+        /// <summary>
+        /// Sends a message to be logged by our logger.
+        /// </summary>
+        /// <param name="message">A string containing the desired message.</param>
+        public void ReportPacket(Packet packet)
+        {
+            logger.Info("Message Data: [Length] " + packet.header.length
+                + " [SrcType] " + packet.header.srcType
+                + " [SrcCode] " + packet.header.srcCode
+                + " [DstType] " + packet.header.dstType
+                + " [DstCode] " + packet.header.dstCode
+                + " [Command] " + packet.body.Cmd
+                + " [Status] " + packet.body.status
+                + " [Data1] " + packet.body.Data1
+                + " [Data2] " + packet.body.Data2
+                );
+        }
+
 
         /// <summary>
         /// Sends an error to be logged by our logger.

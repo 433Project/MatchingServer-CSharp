@@ -160,16 +160,7 @@ namespace MatchingServer_CSharp.Classes
 
             Packet packet;
             messageProcessor.UnPackMessage(message, out packet);
-            logs.ReportMessage("Message Data: [Length] " + packet.header.length
-                + " [SrcType] " + packet.header.srcType
-                + " [SrcCode] " + packet.header.srcCode
-                + " [DstType] " + packet.header.dstType
-                + " [DstCode] " + packet.header.dstCode
-                + " [Command] " + packet.body.Cmd
-                + " [Status] " + packet.body.status
-                + " [Data1] " + packet.body.Data1
-                + " [Data2] " + packet.body.Data2
-                );
+            logs.ReportPacket(packet);
 
             LocalMatchingServerID = packet.body.Data1;
             return true;
@@ -181,6 +172,7 @@ namespace MatchingServer_CSharp.Classes
         /// </summary>
         private void StartConfigServerLoop ()
         {
+            logs.ReportMessage("ServerManager.StartConfigServerLoop: Starting async loop. . .");
             // 1. Send request for matching server data
 
             // 2. Start async loop
@@ -193,7 +185,7 @@ namespace MatchingServer_CSharp.Classes
         /// </summary>
         async Task ConfigServerLoop ()
         {
-            byte[] message = null;
+            byte[] message = new byte[100];
             if(!(await connectionManager.ReceiveMessageFromConfigServerAsync(message))) {
                 // Error with connection
                 logs.ReportMessage("ServerManager.ConfigServerLoop: Attempting to reset connection with ConfigServer. . .");
@@ -202,8 +194,37 @@ namespace MatchingServer_CSharp.Classes
             }
 
             // Message Received
+            Packet packet;
+            if (!messageProcessor.UnPackMessage(message, out packet))
+            {
+                logs.ReportError("ConfigServerLoop: Unable to unpack message.");
+            }
+            logs.ReportPacket(packet);
 
             // Interpret message
+            switch (packet.body.Cmd)
+            {
+                case Command.HealthCheckRequest:
+                    logs.ReportMessage("ConfigServerLoop: Received Health Check Request from ConfigServer");
+                    message = null;
+                    messageProcessor.PackMessage(
+                        new Header(0, TerminalType.MatchingServer, 0, TerminalType.ConfigServer, 0),
+                        Command.HealthCheckResponse,
+                        Status.None,
+                        "",
+                        "",
+                        out message);
+                    if (!connectionManager.SendMessageToConfigServerSync(message))
+                    {
+                        logs.ReportError("SendMessageToConfigServerSync: Could not send message to ConfigServer");
+                        Task.Run(ResetConnectionWithConfigServer);
+                        return;
+                    }
+                    logs.ReportMessage("ConfigServerLoop: Sent Received Health Check Response to ConfigServer");
+                    break;
+                default:
+                    break;
+            }
 
             // Wait for next message
             Task.Run(ConfigServerLoop);
@@ -224,7 +245,6 @@ namespace MatchingServer_CSharp.Classes
                 return;
             }
 
-            logs.ReportMessage("ServerManager.ResetConnectionWithConfigServer: ReconnectStart");
             // 2. Initiate a background reconnection attempt
             if (!(await connectionManager.ConnectWithConfigServerAsync(configServerEndPoint))) {
                 logs.ReportError("ServerManager.ResetConnectionWithConfigServer: Cannot reconnect with ConfigServer");
@@ -232,6 +252,7 @@ namespace MatchingServer_CSharp.Classes
             }
 
             // 3. Restart the ConfigServer loop
+            logs.ReportMessage("ServerManager.ResetConnectionWithConfigServer: Reconnected with ConfigServer at " + configServerEndPoint.Address);
             StartConfigServerLoop();
         }
 

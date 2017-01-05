@@ -149,8 +149,7 @@ namespace MatchingServer_CSharp.Classes
         {
             //Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ConnectWithConfigServerAsync.");
             //Debug.Assert(configServerSocket == null, "ConnectionManager.ConnectWithConfigServerAsync: Already has configured ConfigServer socket.");
-
-            logs.ReportMessage("ConnectionManager.ConnectWithConfigServerAsync: Making new sockets. . .");
+            
             // 1. Create new socket
             Socket newSocket = null;
             try
@@ -167,8 +166,7 @@ namespace MatchingServer_CSharp.Classes
                 logs.ReportError("CreateNewConnection: " + e.Message);
                 return false;
             }
-
-            logs.ReportMessage("ConnectionManager.ConnectWithConfigServerAsync: Attempting to reset connection with ConfigServer. . .");
+            
             // 2. Connect with desired ip end point
             while (true)
             {
@@ -378,7 +376,7 @@ namespace MatchingServer_CSharp.Classes
             Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ReceiveMessageFromConfigServerSync.");
             Debug.Assert(configServerSocket != null, "Cannot call ReceiveMessageFromConfigServerSync if configServerSocket is null!");
 
-            message = new byte[100];
+            //message = new byte[100];
             int bytesReceived = 0;
 
             bytesReceived = await Task.Run(() =>
