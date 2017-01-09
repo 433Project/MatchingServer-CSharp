@@ -31,17 +31,30 @@ namespace MatchingServer_CSharp.Classes
 
         //Properties
         public bool IsInitialized { get; private set; } = false;
+        public int MatchingServerPort { get; private set; } = 9876;
 
         //Sockets and Data structures
         Socket configServerSocket;
+        Socket matchingServerListeningSocket;
         Socket connectionServerSocket;
         ConcurrentDictionary<string, Socket> matchingServerSocketList;
         ConcurrentDictionary<string, Socket> clientSocketList;
+
+        //Private enums
+        private enum ConnectionResultType
+        {
+            Undefined = 0,
+            SocketException = 1,
+            Success = 2,
+            NonSocketException = 3
+        }
 
 
 
         //###########################################
         //              Public Methods
+        //###########################################
+        //              General Methods
         //###########################################
 
         /// <summary>
@@ -52,8 +65,19 @@ namespace MatchingServer_CSharp.Classes
         {
             Debug.Assert(!IsInitialized, "ConnectionManager already initialized. Cannot initialize again.");
 
+            // 1. Create Logs instance
             logs = new Logs();
             logs.ReportMessage("ConnectionManager initializing. . .");
+
+
+            // 2. Get Matching Server port number and store
+            int portNumber;
+            if (!ConfigReader.GetPort("MatchingServers", out portNumber))
+            {
+                return false;
+            }
+            MatchingServerPort = portNumber;
+
 
             IsInitialized = true;
             return true;
@@ -124,6 +148,11 @@ namespace MatchingServer_CSharp.Classes
         }
 
 
+
+        //###########################################
+        //           ConfigServer Methods
+        //###########################################
+
         /// <summary>
         /// Creates a new connection with the connection server synchronously.
         /// </summary>
@@ -175,103 +204,41 @@ namespace MatchingServer_CSharp.Classes
             // 2. Connect with desired ip end point
             while (true)
             {
-                int result = 0;
+                ConnectionResultType result = ConnectionResultType.Undefined;
                 await Task.Run(() =>
                 {
                     try
                     {
                         newSocket.Connect(ipEndPoint);
-                        result = 2;
+                        result = ConnectionResultType.Success;
                     }
                     catch (SocketException e)
                     {
-                        logs.ReportError("CreateNewConnection: SocketException during Socket.Connect() - IP: " + ipEndPoint.Address.ToString() + "  Port: " + ipEndPoint.Port + "  Message: " + e.Message);
-                        result = 1;
+                        logs.ReportError("ConnectWithConfigServerAsync: SocketException during Socket.Connect() - IP: " + ipEndPoint.Address.ToString() + "  Port: " + ipEndPoint.Port + "  Message: " + e.Message);
+                        result = ConnectionResultType.SocketException;
                     }
                     catch (Exception e)
                     {
-                        logs.ReportError("CreateNewConnection: " + e.Message);
+                        logs.ReportError("ConnectWithConfigServerAsync: " + e.Message);
                         newSocket.Close();
-                        result = 0;
+                        result = ConnectionResultType.NonSocketException;
                     }
                 });
 
                 switch (result)
                 {
-                    case 0:
+                    case ConnectionResultType.NonSocketException:
                         return false;
-                    case 1:
+                    case ConnectionResultType.SocketException:
                         await Task.Delay(5000);
                         continue;
-                    case 2:
+                    case ConnectionResultType.Success:
                         configServerSocket = newSocket;
                         return true;
                     default:
                         return false;
                 }
             }
-        }
-
-
-        /// <summary>
-        /// To create listening sockets for a specified connection type.
-        /// </summary>
-        /// <param name="connectionType">The type of connection (ConfigServer, MatchingServer, ConnectionServer, Client).</param>
-        /// <returns>The method returns true on success and false on failure to create and initialize the new listening socket.</returns>
-        public bool CreateListeningSocket (ConnectionType connectionType)
-        {
-            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call CreateListeningSocket.");
-
-            return false;
-        }
-
-
-        /// <summary>
-        /// Ask the connection server for an asynchronous accept call on particular listening socket of given type.
-        /// </summary>
-        /// <param name="connectionType">The type of connection (ConfigServer, MatchingServer, ConnectionServer, Client).</param>
-        /// <param name="connectionID">An out parameter to retrieve the ID of the new connection.</param>
-        public void AcceptNewConnection (ConnectionType connectionType, out string connectionID)
-        {
-            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call AcceptNewConnection.");
-
-            connectionID = "";
-        }
-
-
-        /// <summary>
-        /// Takes the sendToID, looks up the socket and sends the message to that socket.
-        /// </summary>
-        /// <param name="connectionType">The type of connection (ConfigServer, MatchingServer, ConnectionServer, Client).</param>
-        /// <param name="sendToID">ID of the peer to send to. This ID should exist with the context of the connectionType.</param>
-        /// <param name="message">A byte array carrying the message.</param>
-        /// <returns>The method returns true on success and false on failure.</returns>
-        public bool SendMessage (ConnectionType connectionType, string sendToID, byte[] message)
-        {
-            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call SendMessage.");
-            Debug.Assert(message.Length > 0, "Empty message sent to ConnectionManager. Cannot call SendMessage.");
-
-            switch (connectionType)
-            {
-                case ConnectionType.ConfigServer:
-                    return SendMessageToConfigServerSync(message);
-
-                case ConnectionType.MatchingServer:
-                    break;
-
-                case ConnectionType.ConnectionServer:
-                    break;
-
-                case ConnectionType.Client:
-                    break;
-
-                default:
-                    logs.ReportError("SendMessage: Invalid ConnectionType specified.");
-                    return false;
-
-            }
-
-            return false;
         }
 
 
@@ -305,28 +272,6 @@ namespace MatchingServer_CSharp.Classes
             }
 
             return true;
-        }
-
-
-        /// <summary>
-        /// Looks up the socket from the ID and awaits the receipt of a message on that socket. 
-        /// The message is passed as an out parameter. Failure informs the caller that the connection with the ID is no longer viable.
-        /// </summary>
-        /// <param name="connectionType">The type of connection (ConfigServer, MatchingServer, ConnectionServer, Client).</param>
-        /// <param name="receiveFromID">ID of the peer to receive from. This ID should exist with the context of the connectionType.</param>
-        /// <param name="message">An out parameter byte array to store the received message.</param>
-        /// <returns>The method returns true on success and false on failure.</returns>
-        public bool ReceiveMessage (ConnectionType connectionType, string receiveFromID, out byte[] message)
-        {
-            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ReceiveMessage.");
-            Debug.Assert(receiveFromID != null, "ConnectionManager.ReceiveMessage: receiveFromID is null");
-
-            message = null;
-
-
-
-
-            return false;
         }
 
 
@@ -393,14 +338,12 @@ namespace MatchingServer_CSharp.Classes
                 catch (SocketException e)
                 {
                     logs.ReportError("ReceiveMessageFromConfigServerAsync: SocketException during Socket.Receive() - Message: " + e.Message);
-                    configServerSocket.Close();
                     return -2;
                 }
                 catch (Exception e)
                 {
 
                     logs.ReportError("ReceiveMessageFromConfigServerAsync: Exception during Socket.Receive() - Message: " + e.Message);
-                    configServerSocket.Close();
                     return -2;
                 }
             });
@@ -416,6 +359,340 @@ namespace MatchingServer_CSharp.Classes
 
             return true;
         }
+
+
+
+        //###########################################
+        //          MatchingServer Methods
+        //###########################################
+
+        /// <summary>
+        /// Creates a new connection with the connection server asynchronously as a background process.
+        /// </summary>
+        /// <param name="address">The address of the peer to connect with.</param>
+        /// <returns>The method returns true on success and false on failure.</returns>
+        async public Task<bool> ConnectWithMatchingServerAsync(string matchingServerID, string ip)
+        {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ConnectWithMatchingServerAsync.");
+            Debug.Assert(matchingServerID.Length >= 0, "ConnectionManager.ConnectWithMatchingServerAsync: passed matchingServerID string is empty.");
+            Debug.Assert(ip.Length >= 0, "ConnectionManager.ConnectWithMatchingServerAsync: passed ip string is empty.");
+
+
+            // 1. Parse ip address
+            IPAddress address;
+            if (!IPAddress.TryParse(ip, out address))
+            {
+                logs.ReportError("ConnectWithMatchingServerAsync: Could not parse passed ip string.");
+                return false;
+            }
+
+
+            // 2. Create new socket
+            Socket newSocket;
+            if (!TryCreateTCPSocket(out newSocket))
+            {
+                return false;
+            }
+
+
+            // 3. Check if the MS ID is already registered; if not, add it
+            if (!matchingServerSocketList.TryAdd(matchingServerID, newSocket)) {
+                logs.ReportError("ConnectWithMatchingServerAsync: peer MatchingServer ID already registered in the matchingServerSocketList. Cannot attempt connection.");
+                return false;
+            }
+
+
+            // 4. Connect with desired ip end point
+            ConnectionResultType result = ConnectionResultType.Undefined;
+            await Task.Run(() =>
+            {
+                try
+                {
+                    newSocket.Connect(new IPEndPoint(address, MatchingServerPort));
+                    result = ConnectionResultType.Success;
+                }
+                catch (SocketException e)
+                {
+                    logs.ReportError("ConnectWithMatchingServerAsync: SocketException during Socket.Connect() - IP: " + address.ToString() + "  Port: " + MatchingServerPort + " Message: " + e.Message);
+                    result = ConnectionResultType.SocketException;
+                }
+                catch (Exception e)
+                {
+                    logs.ReportError("ConnectWithMatchingServerAsync: " + e.Message);
+                    result = ConnectionResultType.NonSocketException;
+                }
+            });
+
+            if (result != ConnectionResultType.Success)
+            {
+                matchingServerSocketList.TryRemove(matchingServerID, out newSocket);
+                if (newSocket != null)
+                {
+                    newSocket.Close();
+                }
+                return false;
+            }
+
+            return true;
+        }
+
+
+        /// <summary>
+        /// This method creates/initializes the listening socket for accepting new MatchingServer connections.
+        /// </summary>
+        /// <returns>Returns true on successful creation and false on error.</returns>
+        public bool CreateMatchingServerListeningSocket ()
+        {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call CreateMatchingServerListeningSocket.");
+            Debug.Assert(matchingServerListeningSocket == null, "CreateMatchingServerListeningSocket: matchingServerListeningSocket already initialized.");
+
+            // 1. Create new socket
+            Socket newSocket;
+            if (!TryCreateTCPSocket(out newSocket))
+            {
+                return false;
+            }
+
+
+            // 2. Bind and Listen
+            if (!TrySocketListen(newSocket, MatchingServerPort))
+            {
+                return false;
+            }
+            matchingServerListeningSocket = newSocket;
+
+
+            return true;
+        }
+
+
+        /// <summary>
+        /// This method accepts a connection from a new MS peer asynchronously and then asynchronously waits for the first message to arrive. 
+        /// On successful arrival of a message, the ConnectionManager calls ServerManager.ExtractMatchingServerID in order to get the srcCode (ID) 
+        /// for the new connection.
+        /// </summary>
+        /// <param name="firstMessage">A byte[] to hold the first message.</param>
+        /// <returns>Returns true on a successful accept, receive, and registration or false on error.</returns>
+        public async Task<bool> AcceptMatchingServerConnectionAsync (byte[] firstMessage)
+        {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call AcceptMatchingServerConnectionAsync.");
+            Debug.Assert(matchingServerListeningSocket != null, "AcceptMatchingServerConnectionAsync: matchingServerListeningSocket not initialized.");
+
+            
+            // 1. Get the newly accepted socket
+            ConnectionResultType result = ConnectionResultType.Undefined;
+            Socket acceptedSocket = await Task.Run(() =>
+           {
+               try
+               {
+                   acceptedSocket = matchingServerListeningSocket.Accept();
+                   result = ConnectionResultType.Success;
+                   return acceptedSocket;
+               }
+               catch (SocketException e)
+               {
+                   logs.ReportError("AcceptMatchingServerConnectionAsync: SocketException during Socket.Accept(): " + e.Message);
+                   result = ConnectionResultType.SocketException;
+                   return null;
+               }
+               catch (Exception e)
+               {
+                   logs.ReportError("AcceptMatchingServerConnectionAsync: " + e.Message);
+                   result = ConnectionResultType.NonSocketException;
+                   return null;
+               }
+           });
+
+            if (result != ConnectionResultType.Success)
+            {
+                return false;
+            }
+
+
+            // 2. Get the first message
+            int bytesReceived = 0;
+
+            bytesReceived = await Task.Run(() =>
+            {
+                try
+                {
+                    return acceptedSocket.Receive(firstMessage);
+                }
+                catch (SocketException e)
+                {
+                    logs.ReportError("AcceptMatchingServerConnectionAsync: SocketException during Socket.Receive() - Message: " + e.Message);
+                    return -2;
+                }
+                catch (Exception e)
+                {
+
+                    logs.ReportError("AcceptMatchingServerConnectionAsync: Exception during Socket.Receive() - Message: " + e.Message);
+                    return -2;
+                }
+            });
+
+            logs.ReportMessage("AcceptMatchingServerConnectionAsync: Received " + bytesReceived + " bytes");
+
+            if (bytesReceived <= 0)
+            {
+                logs.ReportError("AcceptMatchingServerConnectionAsync: Erroneous bytes received from ConfigServer; Removing MS Entry and closing Connection. . .");
+                acceptedSocket.Close();
+                return false;
+            }
+
+
+            // 3. Register the new socket
+            string matchingServerID = ServerManager.ExtractMatchingServerID(firstMessage);
+
+            if (!matchingServerSocketList.TryAdd(matchingServerID, acceptedSocket))
+            {
+                logs.ReportError("AcceptMatchingServerConnectionAsync: Could not add received matching server ID to socket list. . .");
+                acceptedSocket.Close();
+                return false;
+            }
+
+            return true;
+        }
+
+
+        /// <summary>
+        /// This method sends a message synchronously to the configuration server. Upon error, closes the socket with the ConfigServer.
+        /// </summary>
+        /// <param name="message">A byte[] of the message to be sent.</param>
+        /// <returns>Returns true on a successful send or false on error.</returns>
+        async public Task<bool> SendMessageToMatchingServerAsync(string matchingServerID, byte[] message)
+        {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call SendMessageToConfigServerSync.");
+            Debug.Assert(matchingServerID != null, "Cannot call SendMessageToMatchingServerAsync if matchingServerID is null!");
+            Debug.Assert(message.Length >= 20, "Cannot call SendMessageToMatchingServerAsync if message is smaller than minimum header size!");
+
+            Socket matchingServerSocket;
+
+            if (!matchingServerSocketList.TryGetValue(matchingServerID, out matchingServerSocket))
+            {
+                logs.ReportError("SendMessageToMatchingServerAsync: Cannot find MS ID in socketList: " + matchingServerID);
+                return false;
+            }
+
+            if(!await Task.Run(() =>
+            {
+                try
+                {
+                    int bytesSent = matchingServerSocket.Send(message);
+                    logs.ReportMessage("SendMessageToMatchingServerAsync: Sent " + bytesSent + " bytes to MS: " + matchingServerID);
+                }
+                catch (SocketException e)
+                {
+                    logs.ReportError("SendMessageToMatchingServerAsync: SocketException during Socket.Send() - Message: " + e.Message);
+                    return false;
+                }
+                catch (Exception e)
+                {
+                    logs.ReportError("SendMessageToMatchingServerAsync: Exception during Socket.Send() - Message: " + e.Message);
+                    return false;
+                }
+                return true;
+            }))
+            {
+                matchingServerSocketList.TryRemove(matchingServerID, out matchingServerSocket);
+                if (matchingServerSocket != null)
+                {
+                    matchingServerSocket.Close();
+                }
+            }
+
+            return true;
+        }
+
+
+        /// <summary>
+        /// This method receives a message asynchronously from a specified MatchingServer. If the receive resulted in a problem (bytes received), the socket is closed and false is returned.
+        /// </summary>
+        /// <param name="message">A byte[] parameter of the message to be collected.</param>
+        /// <returns>Returns true on a successful receive or false on error.</returns>
+        async public Task<bool> ReceiveMessageFromMatchingServerAsync(string matchingServerID, byte[] message)
+        {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ReceiveMessageFromConfigServerSync.");
+            Debug.Assert(matchingServerID != null, "Cannot call SendMessageToMatchingServerAsync if matchingServerID is null!");
+
+            Socket matchingServerSocket;
+
+            if (!matchingServerSocketList.TryGetValue(matchingServerID, out matchingServerSocket))
+            {
+                logs.ReportError("ReceiveMessageFromMatchingServerAsync: Cannot find MS ID in socketList: " + matchingServerID);
+                return false;
+            }
+
+            //message = new byte[100];
+            int bytesReceived = 0;
+
+            bytesReceived = await Task.Run(() =>
+            {
+                try
+                {
+                    return matchingServerSocket.Receive(message);
+                }
+                catch (SocketException e)
+                {
+                    logs.ReportError("ReceiveMessageFromMatchingServerAsync: SocketException during Socket.Receive() - Message: " + e.Message);
+                    return -2;
+                }
+                catch (Exception e)
+                {
+
+                    logs.ReportError("ReceiveMessageFromMatchingServerAsync: Exception during Socket.Receive() - Message: " + e.Message);
+                    return -2;
+                }
+            });
+
+            logs.ReportMessage("ReceiveMessageFromMatchingServerAsync: Received " + bytesReceived + " bytes");
+
+            if (bytesReceived <= 0)
+            {
+                logs.ReportError("ReceiveMessageFromMatchingServerAsync: Erroneous bytes received from ConfigServer; Removing MS Entry and closing Connection. . .");
+                matchingServerSocketList.TryRemove(matchingServerID, out matchingServerSocket);
+                if (matchingServerSocket != null)
+                {
+                    matchingServerSocket.Close();
+                }
+                return false;
+            }
+
+            return true;
+        }
+
+
+
+
+
+
+        /// <summary>
+        /// To create listening sockets for a specified connection type.
+        /// </summary>
+        /// <param name="connectionType">The type of connection (ConfigServer, MatchingServer, ConnectionServer, Client).</param>
+        /// <returns>The method returns true on success and false on failure to create and initialize the new listening socket.</returns>
+        public bool CreateListeningSocket (ConnectionType connectionType)
+        {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call CreateListeningSocket.");
+
+            return false;
+        }
+
+
+        /// <summary>
+        /// Ask the connection server for an asynchronous accept call on particular listening socket of given type.
+        /// </summary>
+        /// <param name="connectionType">The type of connection (ConfigServer, MatchingServer, ConnectionServer, Client).</param>
+        /// <param name="connectionID">An out parameter to retrieve the ID of the new connection.</param>
+        public void AcceptNewConnection (ConnectionType connectionType, out string connectionID)
+        {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call AcceptNewConnection.");
+
+            connectionID = "";
+        }
+
+
+        
 
 
         /// <summary>
@@ -493,6 +770,36 @@ namespace MatchingServer_CSharp.Classes
             catch (Exception e)
             {
                 logs.ReportError("TryCreateTCPSocket: " + e.Message);
+                return false;
+            }
+            return true;
+        }
+
+
+        /// <summary>
+        /// This method attempts to bind a socket to a given port and initiate listening on the socket.
+        /// </summary>
+        /// <param name="socket">The socket to configure.</param>
+        /// <param name="port">The port to bind to.</param>
+        /// <returns>Returns true on successful socket binding and listen initialization and false on error.</returns>
+        private bool TrySocketListen(Socket socket, int port)
+        {
+            Debug.Assert(socket != null, "TrySocketListen: socket cannot be null.");
+            Debug.Assert(port >= IPEndPoint.MinPort && port <= IPEndPoint.MaxPort, "TrySocketListen: port value is out of bounds.");
+
+            try
+            {
+                socket.Bind(new IPEndPoint(IPAddress.Any, port));
+                socket.Listen(10);
+            }
+            catch (SocketException e)
+            {
+                logs.ReportError("TrySocketListen: SocketException during Socket.Bind or Socket.Listen(...):" + e.Message);
+                return false;
+            }
+            catch (Exception e)
+            {
+                logs.ReportError("TrySocketListen: " + e.Message);
                 return false;
             }
             return true;

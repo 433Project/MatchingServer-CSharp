@@ -103,6 +103,53 @@ namespace MatchingServer_CSharp.Classes
         }
 
 
+        public static bool GetPort (string xmlNodeName, out int portNumber)
+        {
+            portNumber = 8765;
+            XmlTextReader xmlTextReader = null;
+
+            try
+            {
+                xmlTextReader = new XmlTextReader("network.xml");
+
+                if (!xmlTextReader.ReadToFollowing(xmlNodeName))
+                {
+                    logs.ReportError("GetIPEndPoint cannot find node <" + xmlNodeName + ">");
+                    return false;
+                }
+                if (!xmlTextReader.ReadToDescendant("port"))
+                {
+                    logs.ReportError("GetIPEndPoint cannot find child node <ip> within node <" + xmlNodeName + ">");
+                    return false;
+                }
+                xmlTextReader.Read();
+                if (!int.TryParse(xmlTextReader.Value, out portNumber))
+                {
+                    logs.ReportError("GetIPEndPoint cannot parse port value within node <" + xmlNodeName + ">");
+                    return false;
+                }
+            }
+            catch (FileNotFoundException e)
+            {
+                logs.ReportError("GetIPEndPoint cannot find XML-file ...\\network.xml");
+                return false;
+            }
+            catch (XmlException e)
+            {
+                logs.ReportError("GetIPEndPoint: " + e.Message);
+                return false;
+            }
+            catch (Exception e)
+            {
+                logs.ReportError("GetIPEndPoint: " + e.Message);
+                return false;
+            }
+
+            return true;
+        }
+
+
+
         //###########################################
         //              Private Methods
         //###########################################

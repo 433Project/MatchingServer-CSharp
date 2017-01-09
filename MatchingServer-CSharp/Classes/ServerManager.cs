@@ -18,7 +18,7 @@ namespace MatchingServer_CSharp.Classes
         //###########################################
         private Logs logs;
         private ConnectionManager connectionManager;
-        private MessageProcessor messageProcessor;
+        private static MessageProcessor messageProcessor;
 
         //Properties
         public bool IsInitialized { get; private set; } = false;
@@ -72,7 +72,12 @@ namespace MatchingServer_CSharp.Classes
             // 3. Create ConfigServer async service loop
             StartConfigServerLoop();
 
-            // 4. Create MatchingServer async service loop
+
+            // 4. Create MatchingServer async listening loop
+            if (!StartMatchingServerListeningLoop())
+            {
+
+            }
 
 
             // 5. Initialize PlayerManager
@@ -87,10 +92,28 @@ namespace MatchingServer_CSharp.Classes
 
 
 
+        /// <summary>
+        /// This method provides a way for another class, such as the ConnectionManager, to determine the ID of a new connection by reading the srcCode (source code) of the first message received.
+        /// </summary>
+        /// <param name="message">The message containing the data.</param>
+        /// <returns></returns>
+        public static string ExtractMatchingServerID (byte[] message)
+        {
+            Debug.Assert(message.Length >= 20, "Message passed to ExtractMatchingServerID is of incorrect length.");
+
+            Packet packet;
+            messageProcessor.UnPackMessage(message, out packet);
+
+            return packet.header.srcCode.ToString();
+        }
+
+
+
         //###########################################
         //              Private Methods
         //###########################################
-
+        //              ConfigServer
+        //###########################################
 
         /// <summary>
         /// This method attempts to connect to the ConfigServer and upon failure, will retry numberOfAttempts number of times (or infinite if 0).
@@ -183,6 +206,8 @@ namespace MatchingServer_CSharp.Classes
         private void StartConfigServerLoop ()
         {
             logs.ReportMessage("ServerManager.StartConfigServerLoop: Starting async loop. . .");
+
+
             // 1. Send request for matching server data
             byte[] message;
             messageProcessor.PackMessage(
@@ -199,6 +224,7 @@ namespace MatchingServer_CSharp.Classes
                 return;
             }
             logs.ReportMessage("SendMessageToConfigServerSync: Sent MatchingServerListRequest to ConfigServer");
+
 
             // 2. Start async loop
             Task.Run(ConfigServerLoop);
@@ -247,6 +273,12 @@ namespace MatchingServer_CSharp.Classes
                     }
                     logs.ReportMessage("ConfigServerLoop: Sent Received Health Check Response to ConfigServer");
                     break;
+
+                case Command.MatchingServerListResponse:
+                    logs.ReportMessage("ConfigServerLoop: Received MatchingServerListResponse from ConfigServer: ID: " + packet.body.Data1 + " IP: " + packet.body.Data2);
+                    StartMatchingServerConnection(packet.body.Data1, packet.body.Data2);
+                    break;
+
                 default:
                     break;
             }
@@ -282,13 +314,60 @@ namespace MatchingServer_CSharp.Classes
         }
 
 
+
+        //###########################################
+        //          MatchingServer Methods
+        //###########################################
+
+
+        /// <summary>
+        /// This method attempts to start a connection with another MatchingServer, then start a corresponding async receive loop.
+        /// </summary>
+        /// <param name="matchingServerID">The ID of the peer MatchingServer.</param>
+        /// <param name="ip">The IP address of the peer MatchingServer.</param>
+        private void StartMatchingServerConnection (string matchingServerID, string ip)
+        {
+            Task.Run(async () =>
+            {
+                // 1. Attempt to make a connection
+                if (!await connectionManager.ConnectWithMatchingServerAsync(matchingServerID, ip))
+                {
+                    return;
+                }
+
+
+                // 2. Send the local MS ID to the peer MS
+                byte[] message = new byte[100];
+                messageProcessor.PackMessage(
+                        new Header(0, TerminalType.MatchingServer, LocalMatchingServerIDCode, TerminalType.MatchingServer, 0),
+                        Command.MatchingServerIDTransmit,
+                        Status.None,
+                        "",
+                        "",
+                        out message);
+                await connectionManager.SendMessageToMatchingServerAsync(matchingServerID, message);
+
+
+                // 3. Start a Async MS Receive loop
+            });
+        }
+
+
         /// <summary>
         /// Initiates listening for MatchingServers and then starts a loop with asynchronous accept calls to receive new connections from new MatchingServers.
         /// </summary>
         /// <returns>This function returns false if the listening socket creation failed, otherwise returns true.</returns>
         private bool StartMatchingServerListeningLoop ()
         {
-            return false;
+            if (!connectionManager.CreateMatchingServerListeningSocket())
+            {
+                logs.ReportError("ServerManager.StartMatchingServerListeningLoop: Could not initialize a MatchingServer listening socket.");
+                return false;
+            }
+
+            logs.ReportMessage("ServerManager.StartMatchingServerListeningLoop: MatchingServer listening socket initialized successfully.");
+            MatchingServerAcceptingLoop();
+            return true;
         }
 
 
@@ -297,6 +376,30 @@ namespace MatchingServer_CSharp.Classes
         /// </summary>
         async private void MatchingServerAcceptingLoop ()
         {
+            byte[] message = new byte[100];
+            if (!await connectionManager.AcceptMatchingServerConnectionAsync(message))
+            {
+                // An accept call failed
+            }
+            VerifyNewMatchingServer(message);
+
+            MatchingServerAcceptingLoop();
+        }
+
+
+        /// <summary>
+        /// This method takes the first message from a peer MS and verifies the identify with the ConfigServer before creating a receive message loop. 
+        /// Failure to verify results in calling ConnectionManager to end the connection.
+        /// </summary>
+        /// <param name="message">A byte[] holding the first message.</param>
+        async private void VerifyNewMatchingServer (byte[] message)
+        {
+            // 1. Get message details
+            Packet packet;
+            messageProcessor.UnPackMessage(message, out packet);
+            logs.ReportPacket(packet);
+            string matchingServerID = packet.header.srcCode.ToString();
+
 
         }
 
