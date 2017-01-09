@@ -276,7 +276,7 @@ namespace MatchingServer_CSharp.Classes
 
 
         /// <summary>
-        /// This method sends a message synchronously to the configuration server.
+        /// This method sends a message synchronously to the configuration server. Upon error, closes the socket with the ConfigServer.
         /// </summary>
         /// <param name="message">A byte[] of the message to be sent.</param>
         /// <returns>Returns true on a successful send or false on error.</returns>

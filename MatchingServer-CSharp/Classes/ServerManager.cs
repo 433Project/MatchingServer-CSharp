@@ -23,6 +23,7 @@ namespace MatchingServer_CSharp.Classes
         //Properties
         public bool IsInitialized { get; private set; } = false;
         public string LocalMatchingServerID { get; private set; }
+        public int LocalMatchingServerIDCode { get; private set; }
 
 
         //###########################################
@@ -133,7 +134,7 @@ namespace MatchingServer_CSharp.Classes
         /// <returns>Returns false if either sending the ID request or receiving the answer failed and true upon successful registration.</returns>
         private bool GetIDFromConfigServer ()
         {
-            Debug.Assert(connectionManager != null, "ConnectionManager is null. ServerManager cannot call ConnectWithConfigServer.");
+            Debug.Assert(connectionManager != null, "ConnectionManager is null. ServerManager cannot use ConnectionManager.");
 
             byte[] message;
             messageProcessor.PackMessage(
@@ -146,23 +147,32 @@ namespace MatchingServer_CSharp.Classes
 
             if (!connectionManager.SendMessageToConfigServerSync(message))
             {
-                logs.ReportError("SendMessageToConfigServerSync: Could not send message to ConfigServer");
+                logs.ReportError("GetIDFromConfigServer: Could not send MatchingServerIDRequest to ConfigServer");
                 return false;
             }
-            logs.ReportMessage("SendMessageToConfigServerSync: Sent message to ConfigServer");
+            logs.ReportMessage("GetIDFromConfigServer: Sent MatchingServerIDRequest to ConfigServer");
 
             if (!connectionManager.ReceiveMessageFromConfigServerSync(out message))
             {
-                logs.ReportError("ReceiveMessageFromConfigServerSync: Could not receive message from ConfigServer");
+                logs.ReportError("GetIDFromConfigServer: Could not receive message from ConfigServer");
                 return false;
             }
-            logs.ReportMessage("ReceiveMessageFromConfigServerSync: Received message from ConfigServer");
+            logs.ReportMessage("GetIDFromConfigServer: Received message from ConfigServer");
 
             Packet packet;
             messageProcessor.UnPackMessage(message, out packet);
             logs.ReportPacket(packet);
 
             LocalMatchingServerID = packet.body.Data1;
+            int matchingServerSourceCode;
+            if (!int.TryParse(LocalMatchingServerID, out matchingServerSourceCode))
+            {
+                logs.ReportError("GetIDFromConfigServer: Invalid ID received from ConfigServer. Could not parse ID data: " + packet.body.Data1);
+                matchingServerSourceCode = -1;
+                return false;
+            }
+            LocalMatchingServerIDCode = matchingServerSourceCode;
+
             return true;
         }
 
@@ -174,6 +184,21 @@ namespace MatchingServer_CSharp.Classes
         {
             logs.ReportMessage("ServerManager.StartConfigServerLoop: Starting async loop. . .");
             // 1. Send request for matching server data
+            byte[] message;
+            messageProcessor.PackMessage(
+                new Header(0, TerminalType.MatchingServer, LocalMatchingServerIDCode, TerminalType.ConfigServer, 0),
+                Command.MatchingServerListRequest,
+                Status.None,
+                "",
+                "",
+                out message);
+            if (!connectionManager.SendMessageToConfigServerSync(message))
+            {
+                logs.ReportError("SendMessageToConfigServerSync: Could not send MatchingServerListRequest to ConfigServer");
+                Task.Run(ResetConnectionWithConfigServer);
+                return;
+            }
+            logs.ReportMessage("SendMessageToConfigServerSync: Sent MatchingServerListRequest to ConfigServer");
 
             // 2. Start async loop
             Task.Run(ConfigServerLoop);
