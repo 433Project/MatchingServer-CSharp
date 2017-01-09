@@ -71,37 +71,16 @@ namespace MatchingServer_CSharp.Classes
             Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call CreateNewConnection.");
 
             // 1. Create new socket
-            Socket newSocket = null;
-            try
+            Socket newSocket;
+            if (!TryCreateTCPSocket(out newSocket))
             {
-                newSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            }
-            catch (SocketException e)
-            {
-                logs.ReportError("CreateNewConnection: SocketException during new Socket(...)");
-                return false;
-            }
-            catch (Exception e)
-            {
-                logs.ReportError("CreateNewConnection: " + e.Message);
                 return false;
             }
 
 
             // 2. Connect with desired ip end point
-            try
+            if (!ConnectSocketToAddress(newSocket, ipEndPoint))
             {
-                newSocket.Connect(ipEndPoint);
-            }
-            catch (SocketException e)
-            {
-                logs.ReportError("CreateNewConnection: SocketException during Socket.Connect() - IP: " + ipEndPoint.Address.ToString() + "  Port: " + ipEndPoint.Port + "  Message: " + e.Message);
-                newSocket.Close();
-                return false;
-            }
-            catch (Exception e)
-            {
-                logs.ReportError("CreateNewConnection: " + e.Message);
                 newSocket.Close();
                 return false;
             }
@@ -144,29 +123,55 @@ namespace MatchingServer_CSharp.Classes
             return true;
         }
 
-        
+
+        /// <summary>
+        /// Creates a new connection with the connection server synchronously.
+        /// </summary>
+        /// <param name="address">The address of the peer to connect with.</param>
+        /// <returns>The method returns true on success and false on failure.</returns>
+        public bool ConnectWithConfigServerSync(IPEndPoint ipEndPoint)
+        {
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call CreateNewConnection.");
+            Debug.Assert(configServerSocket == null, "ConnectionManager.CreateNewConnection: Already has configured ConfigServer socket.");
+
+            // 1. Create new socket
+            Socket newSocket;
+            if (!TryCreateTCPSocket (out newSocket))
+            {
+                return false;
+            }
+
+
+            // 2. Connect with desired ip end point
+            if (!ConnectSocketToAddress(newSocket, ipEndPoint))
+            {
+                newSocket.Close();
+                return false;
+            }
+
+
+            configServerSocket = newSocket;
+            return true;
+        }
+
+
+        /// <summary>
+        /// Creates a new connection with the connection server asynchronously as a background process.
+        /// </summary>
+        /// <param name="address">The address of the peer to connect with.</param>
+        /// <returns>The method returns true on success and false on failure.</returns>
         async public Task<bool> ConnectWithConfigServerAsync (IPEndPoint ipEndPoint)
         {
             //Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ConnectWithConfigServerAsync.");
             //Debug.Assert(configServerSocket == null, "ConnectionManager.ConnectWithConfigServerAsync: Already has configured ConfigServer socket.");
-            
+
             // 1. Create new socket
-            Socket newSocket = null;
-            try
+            Socket newSocket;
+            if (!TryCreateTCPSocket(out newSocket))
             {
-                newSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            }
-            catch (SocketException e)
-            {
-                logs.ReportError("CreateNewConnection: SocketException during new Socket(...)");
                 return false;
             }
-            catch (Exception e)
-            {
-                logs.ReportError("CreateNewConnection: " + e.Message);
-                return false;
-            }
-            
+
             // 2. Connect with desired ip end point
             while (true)
             {
@@ -468,5 +473,58 @@ namespace MatchingServer_CSharp.Classes
         //              Private Methods
         //###########################################
         
+        /// <summary>
+        /// This method attempts to create a new socket configured for TCP and protects against socket creation failure.
+        /// </summary>
+        /// <param name="newSocket">A out parameter for the caller to receive the newly configured socket.</param>
+        /// <returns>Returns true on successful socket creation and false on error.</returns>
+        private bool TryCreateTCPSocket (out Socket newSocket)
+        {
+            newSocket = null;
+            try
+            {
+                newSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            }
+            catch (SocketException e)
+            {
+                logs.ReportError("TryCreateTCPSocket: SocketException during new Socket(...):" + e.Message);
+                return false;
+            }
+            catch (Exception e)
+            {
+                logs.ReportError("TryCreateTCPSocket: " + e.Message);
+                return false;
+            }
+            return true;
+        }
+
+
+        /// <summary>
+        /// This method connects a socket to a given IP EndPoint. Upon error, it does not close the socket. The caller must chose how to react during the error condition.
+        /// </summary>
+        /// <param name="socket">The socket to use in the connection.</param>
+        /// <param name="addressEndPoint">The end point of the peer to connect with.</param>
+        /// <returns>Returns true on a successful connection and false on error.</returns>
+        private bool ConnectSocketToAddress (Socket socket, IPEndPoint addressEndPoint)
+        {
+            Debug.Assert(socket != null, "ConnectSocketToAddress: socket cannot be null.");
+            Debug.Assert(addressEndPoint != null, "ConnectSocketToAddress: addressEndPoint cannot be null.");
+
+            try
+            {
+                socket.Connect(addressEndPoint);
+            }
+            catch (SocketException e)
+            {
+                logs.ReportError("ConnectSocketToAddress: SocketException during Socket.Connect() - IP: " + addressEndPoint.Address.ToString() + "  Port: " + addressEndPoint.Port + "  Message: " + e.Message);
+                return false;
+            }
+            catch (Exception e)
+            {
+                logs.ReportError("ConnectSocketToAddress: " + e.Message);
+                return false;
+            }
+            return true;
+        }
     }
 }

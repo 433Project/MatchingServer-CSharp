@@ -107,7 +107,7 @@ namespace MatchingServer_CSharp.Classes
                 return false;
             }
             
-            while (!connectionManager.CreateNewConnection(ConnectionType.ConfigServer, configServerEndPoint))
+            while (!connectionManager.ConnectWithConfigServerSync(configServerEndPoint))
             {
                 switch (numberOfAttempts)
                 {
