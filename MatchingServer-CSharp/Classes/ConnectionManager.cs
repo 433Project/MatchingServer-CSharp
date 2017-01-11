@@ -79,6 +79,10 @@ namespace MatchingServer_CSharp.Classes
             MatchingServerPort = portNumber;
 
 
+            // 3. Initialize the MatchingServerList
+            matchingServerSocketList = new ConcurrentDictionary<string, Socket>();
+            clientSocketList = new ConcurrentDictionary<string, Socket>();
+
             IsInitialized = true;
             return true;
         }
@@ -378,13 +382,21 @@ namespace MatchingServer_CSharp.Classes
             Debug.Assert(ip.Length >= 0, "ConnectionManager.ConnectWithMatchingServerAsync: passed ip string is empty.");
 
 
-            // 1. Parse ip address
+            // 1. Parse ip address and calculate port
             IPAddress address;
             if (!IPAddress.TryParse(ip, out address))
             {
                 logs.ReportError("ConnectWithMatchingServerAsync: Could not parse passed ip string.");
                 return false;
             }
+            int port;
+            if (!int.TryParse(matchingServerID, out port))
+            {
+                logs.ReportError("ConnectWithMatchingServerAsync: Could not parse passed matchingServerID string.");
+                return false;
+            }
+            port += MatchingServerPort;
+            logs.ReportMessage("ConnectWithMatchingServerAsync: Connecting with MatchingServer (ID = " + matchingServerID + " IP = " + ip + ":" + port + "). . .");
 
 
             // 2. Create new socket
@@ -393,22 +405,15 @@ namespace MatchingServer_CSharp.Classes
             {
                 return false;
             }
+            
 
-
-            // 3. Check if the MS ID is already registered; if not, add it
-            if (!matchingServerSocketList.TryAdd(matchingServerID, newSocket)) {
-                logs.ReportError("ConnectWithMatchingServerAsync: peer MatchingServer ID already registered in the matchingServerSocketList. Cannot attempt connection.");
-                return false;
-            }
-
-
-            // 4. Connect with desired ip end point
+            // 3. Connect with desired ip end point
             ConnectionResultType result = ConnectionResultType.Undefined;
             await Task.Run(() =>
             {
                 try
                 {
-                    newSocket.Connect(new IPEndPoint(address, MatchingServerPort));
+                    newSocket.Connect(new IPEndPoint(address, port));
                     result = ConnectionResultType.Success;
                 }
                 catch (SocketException e)
@@ -425,14 +430,20 @@ namespace MatchingServer_CSharp.Classes
 
             if (result != ConnectionResultType.Success)
             {
-                matchingServerSocketList.TryRemove(matchingServerID, out newSocket);
-                if (newSocket != null)
-                {
-                    newSocket.Close();
-                }
+                newSocket.Close();
                 return false;
             }
 
+            
+            // 4. Check if the MS ID is already registered; if not, add it
+            if (!matchingServerSocketList.TryAdd(matchingServerID, newSocket))
+            {
+                logs.ReportError("ConnectWithMatchingServerAsync: peer MatchingServer ID already registered in the matchingServerSocketList. Cannot attempt connection.");
+                return false;
+            }
+
+
+            logs.ReportMessage("ServerManager.ConnectWithMatchingServerAsync: Connecting with MatchingServer (ID = " + matchingServerID + " IP = " + ip + ") successful!");
             return true;
         }
 
@@ -441,12 +452,23 @@ namespace MatchingServer_CSharp.Classes
         /// This method creates/initializes the listening socket for accepting new MatchingServer connections.
         /// </summary>
         /// <returns>Returns true on successful creation and false on error.</returns>
-        public bool CreateMatchingServerListeningSocket ()
+        public bool CreateMatchingServerListeningSocket (string localMatchingServerID)
         {
             Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call CreateMatchingServerListeningSocket.");
             Debug.Assert(matchingServerListeningSocket == null, "CreateMatchingServerListeningSocket: matchingServerListeningSocket already initialized.");
 
-            // 1. Create new socket
+            // 1. Parse ID value for port calculation
+            int port;
+            if (!int.TryParse(localMatchingServerID, out port))
+            {
+                logs.ReportError("CreateMatchingServerListeningSocket: Could not parse passed matchingServerID string.");
+                return false;
+            }
+            port += MatchingServerPort;
+            logs.ReportMessage("CreateMatchingServerListeningSocket: Local MatchingServer port set to: " + port + ".");
+
+
+            // 2. Create new socket
             Socket newSocket;
             if (!TryCreateTCPSocket(out newSocket))
             {
@@ -454,8 +476,8 @@ namespace MatchingServer_CSharp.Classes
             }
 
 
-            // 2. Bind and Listen
-            if (!TrySocketListen(newSocket, MatchingServerPort))
+            // 3. Bind and Listen
+            if (!TrySocketListen(newSocket, port))
             {
                 return false;
             }
@@ -543,6 +565,7 @@ namespace MatchingServer_CSharp.Classes
 
             // 3. Register the new socket
             string matchingServerID = ServerManager.ExtractMatchingServerID(firstMessage);
+            Debug.Assert(matchingServerID != null, "AcceptMatchingServerConnectionAsync: Should not of received null matchingServerID.");
 
             if (!matchingServerSocketList.TryAdd(matchingServerID, acceptedSocket))
             {
@@ -579,7 +602,7 @@ namespace MatchingServer_CSharp.Classes
                 try
                 {
                     int bytesSent = matchingServerSocket.Send(message);
-                    logs.ReportMessage("SendMessageToMatchingServerAsync: Sent " + bytesSent + " bytes to MS: " + matchingServerID);
+                    logs.ReportMessage("SendMessageToMatchingServerAsync: Sent " + bytesSent + " bytes to MS #" + matchingServerID);
                 }
                 catch (SocketException e)
                 {

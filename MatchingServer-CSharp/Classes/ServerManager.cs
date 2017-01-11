@@ -359,7 +359,7 @@ namespace MatchingServer_CSharp.Classes
         /// <returns>This function returns false if the listening socket creation failed, otherwise returns true.</returns>
         private bool StartMatchingServerListeningLoop ()
         {
-            if (!connectionManager.CreateMatchingServerListeningSocket())
+            if (!connectionManager.CreateMatchingServerListeningSocket(LocalMatchingServerID))
             {
                 logs.ReportError("ServerManager.StartMatchingServerListeningLoop: Could not initialize a MatchingServer listening socket.");
                 return false;
@@ -379,7 +379,9 @@ namespace MatchingServer_CSharp.Classes
             byte[] message = new byte[100];
             if (!await connectionManager.AcceptMatchingServerConnectionAsync(message))
             {
-                // An accept call failed
+                // An accept call or first messsage received failed
+                MatchingServerAcceptingLoop();
+                return;
             }
             VerifyNewMatchingServer(message);
 
