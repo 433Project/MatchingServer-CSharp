@@ -239,7 +239,7 @@ namespace MatchingServer_CSharp.Classes
             byte[] message = new byte[100];
             if(!(await connectionManager.ReceiveMessageFromConfigServerAsync(message))) {
                 // Error with connection
-                logs.ReportMessage("ServerManager.ConfigServerLoop: Attempting to reset connection with ConfigServer. . .");
+                logs.ReportError("ServerManager.ConfigServerLoop: Attempting to reset connection with ConfigServer. . .");
                 Task.Run(ResetConnectionWithConfigServer);
                 return;
             }
@@ -277,6 +277,58 @@ namespace MatchingServer_CSharp.Classes
                 case Command.MatchingServerListResponse:
                     logs.ReportMessage("ConfigServerLoop: Received MatchingServerListResponse from ConfigServer: ID: " + packet.body.Data1 + " IP: " + packet.body.Data2);
                     StartMatchingServerConnection(packet.body.Data1, packet.body.Data2);
+                    break;
+
+                case Command.MatchingServerIDVerifyResponse:
+                    logs.ReportMessage("ConfigServerLoop: Received MatchingServerIDVerifyResponse from ConfigServer: ID: " + packet.body.Data1 + " Status: " + packet.body.status);
+                    int peerMatchingServerCode;
+                    if (!int.TryParse(packet.body.Data1, out peerMatchingServerCode))
+                    {
+                        peerMatchingServerCode = -1;
+                    }
+                    if (packet.body.status != Status.Success)
+                    {
+                        logs.ReportError("ConfigServerLoop: Disconnecting unverified MatchingServer ID: " + packet.body.Data1);
+                        message = null;
+                        messageProcessor.PackMessage(
+                            new Header(0, TerminalType.MatchingServer, LocalMatchingServerIDCode, TerminalType.MatchingServer, peerMatchingServerCode),
+                            Command.MatchingServerIDTransmitResponse,
+                            Status.Fail,
+                            "",
+                            "",
+                            out message);
+                        Task denyMatchingServer = connectionManager.SendMessageToMatchingServerAsync(packet.body.Data1, message)
+                            .ContinueWith(antecedent =>
+                            {
+                                // If the send message failed, don't bother disconnecting since SendMessageToMatchingServerAsync already does that on failure
+                                if (antecedent.Result)
+                                {
+                                    connectionManager.DisconnectMatchingServer(packet.body.Data1);
+                                }
+                            });
+
+                        break;
+                    }
+
+                    // A. Inform the MatchingServer their transmission was successful
+                    message = null;
+                    messageProcessor.PackMessage(
+                            new Header(0, TerminalType.MatchingServer, LocalMatchingServerIDCode, TerminalType.MatchingServer, peerMatchingServerCode),
+                            Command.MatchingServerIDTransmitResponse,
+                            Status.Success,
+                            "",
+                            "",
+                            out message);
+                    Task verifiedMatchingServer = connectionManager.SendMessageToMatchingServerAsync(packet.body.Data1, message)
+                        .ContinueWith(antecedent =>
+                       {
+                           if (antecedent.Result)
+                           {
+                                // B. Start MatchingServer receive loop for that server
+
+                            }
+                       });
+                    verifiedMatchingServer.Start();
                     break;
 
                 default:
@@ -349,6 +401,7 @@ namespace MatchingServer_CSharp.Classes
 
 
                 // 3. Start a Async MS Receive loop
+                MatchingServerLoop(matchingServerID);
             });
         }
 
@@ -374,7 +427,7 @@ namespace MatchingServer_CSharp.Classes
         /// <summary>
         /// This method runs a loop with asynchronous accept calls to receive new MatchingServers
         /// </summary>
-        async private void MatchingServerAcceptingLoop ()
+        async private Task MatchingServerAcceptingLoop ()
         {
             byte[] message = new byte[100];
             if (!await connectionManager.AcceptMatchingServerConnectionAsync(message))
@@ -394,24 +447,90 @@ namespace MatchingServer_CSharp.Classes
         /// Failure to verify results in calling ConnectionManager to end the connection.
         /// </summary>
         /// <param name="message">A byte[] holding the first message.</param>
-        async private void VerifyNewMatchingServer (byte[] message)
+        async private Task VerifyNewMatchingServer (byte[] message)
         {
-            // 1. Get message details
-            Packet packet;
-            messageProcessor.UnPackMessage(message, out packet);
-            logs.ReportPacket(packet);
-            string matchingServerID = packet.header.srcCode.ToString();
+            await Task.Run(() => 
+            {
+                // 1. Get message details
+                Packet packet;
+                messageProcessor.UnPackMessage(message, out packet);
+                logs.ReportPacket(packet);
+                string peerMatchingServerID = packet.header.srcCode.ToString();
 
 
+                // 2. Send verification message to ConfigServer
+                logs.ReportMessage("ServerManager.VerifyNewMatchingServer: Verifying MS #" + peerMatchingServerID + " with ConfigServer.");
+                byte[] verificationMessage = new byte[100];
+                messageProcessor.PackMessage(
+                            new Header(0, TerminalType.MatchingServer, LocalMatchingServerIDCode, TerminalType.ConfigServer, 0),
+                            Command.MatchingServerIDVerify,
+                            Status.None,
+                            peerMatchingServerID,
+                            "",
+                            out verificationMessage);
+                if (!connectionManager.SendMessageToConfigServerSync(verificationMessage))
+                {
+                    logs.ReportError("ServerManager.VerifyNewMatchingServer: Verifying failed due to connection problem with ConfigServer. Shutting down connection with MS #" + peerMatchingServerID);
+                    connectionManager.DisconnectMatchingServer(peerMatchingServerID);
+                }
+            });
         }
 
 
         /// <summary>
         /// Loop asynchronous receive calls on a new MatchingServer connection in order to receive messages from that MatchingServer.
         /// </summary>
-        async void StartNewMatchingServerLoop ()
+        /// <param name="matchingServerID">A string identifier for the MatchingServer.</param>
+        async Task MatchingServerLoop(string matchingServerID)
         {
+            byte[] message = new byte[100];
+            if (!(await connectionManager.ReceiveMessageFromMatchingServerAsync(matchingServerID, message)))
+            {
+                // Error with connection - end loop
+                logs.ReportError("ServerManager.MatchingServerLoop: Closed connection with MatchingServer #" + matchingServerID);
+                return;
+            }
 
+            // Message Received
+            Packet packet;
+            if (!messageProcessor.UnPackMessage(message, out packet))
+            {
+                logs.ReportError("MatchingServerLoop: Unable to unpack message.");
+            }
+            logs.ReportPacket(packet);
+
+            // Interpret message
+            switch (packet.body.Cmd)
+            {
+                case Command.HealthCheckRequest:
+                    logs.ReportMessage("MatchingServerLoop: Received Health Check Request from MatchingServer");
+                    message = null;
+                    messageProcessor.PackMessage(
+                        new Header(0, TerminalType.MatchingServer, LocalMatchingServerIDCode, TerminalType.MatchingServer, int.Parse(matchingServerID)),
+                        Command.HealthCheckResponse,
+                        Status.None,
+                        "",
+                        "",
+                        out message);
+                    connectionManager.SendMessageToMatchingServerAsync(matchingServerID, message);
+                    logs.ReportMessage("MatchingServerLoop: Sent Received Health Check Response to MatchingServer #" + matchingServerID);
+                    break;
+
+                case Command.MatchingServerIDTransmitResponse:
+                    logs.ReportMessage("MatchingServerLoop: Received MatchingServerIDTransmitResponse from MatchingServer: ID: " + packet.header.srcCode + " Status: " + packet.body.status);
+                    if (packet.body.status != Status.Success)
+                    {
+                        logs.ReportError("MatchingServerLoop: Peer MatchingServer #" + packet.body.Data1 + " denied verification. Closing connection. . .");
+                        connectionManager.DisconnectMatchingServer(packet.body.Data1);
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+
+            // Wait for next message
+            Task.Run(() => MatchingServerLoop (matchingServerID));
         }
 
 

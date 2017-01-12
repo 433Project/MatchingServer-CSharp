@@ -574,6 +574,8 @@ namespace MatchingServer_CSharp.Classes
                 return false;
             }
 
+            Console.WriteLine(matchingServerID);
+
             return true;
         }
 
@@ -685,21 +687,28 @@ namespace MatchingServer_CSharp.Classes
         }
 
 
-
-
-
-
         /// <summary>
-        /// To create listening sockets for a specified connection type.
+        /// This method tells the ConnectionManager to shut down a connection to a particular MatchingServer that is not needed anymore.
         /// </summary>
-        /// <param name="connectionType">The type of connection (ConfigServer, MatchingServer, ConnectionServer, Client).</param>
-        /// <returns>The method returns true on success and false on failure to create and initialize the new listening socket.</returns>
-        public bool CreateListeningSocket (ConnectionType connectionType)
+        /// <param name="connectionID">ID of the peer to disconnect with. This ID should exist with the context of MatchingServers.</param>
+        public void DisconnectMatchingServer (string matchingServerID)
         {
-            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call CreateListeningSocket.");
+            Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call Disconnect.");
+            Debug.Assert(matchingServerID != null, "ConnectionManager.DisconnectMatchingServer: null matchingServerID passed.");
 
-            return false;
+            Socket matchingServerSocket;
+            if(!matchingServerSocketList.TryRemove(matchingServerID, out matchingServerSocket))
+            {
+                logs.ReportError("DisconnectMatchingServer: Could not find matchingServerID in matchingServerSocketList. . .");
+                return;
+            }
+            if (matchingServerSocket != null)
+            {
+                matchingServerSocket.Close();
+            }
         }
+
+
 
 
         /// <summary>
