@@ -1,4 +1,5 @@
-# MatchingServer-CSharp
+# MatchingServer-CSharp (In development)
+
 An alternative MatchingServer for "433Project" built with C#.
 
 Please find the function specifications and other documentation here:
