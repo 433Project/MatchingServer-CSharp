@@ -19,6 +19,7 @@ namespace MatchingServer_CSharp.Classes
         private Logs logs;
         private ConnectionManager connectionManager;
         private static MessageProcessor messageProcessor;
+        private uint initialConfigServerConnectAttempts;
 
         //Properties
         public bool IsInitialized { get; private set; } = false;
@@ -48,9 +49,20 @@ namespace MatchingServer_CSharp.Classes
             messageProcessor = new MessageProcessor();
             messageProcessor.Initialize();
 
+            // 0. Get settings values
+            int value;
+            ConfigReader.GetSettingsIntValue("ConfigServerConnectAttempts", out value);
+            logs.ReportMessage("Read " + value + " from config file's ConfigServerConnectAttempts node.");
+            if (value < 0)
+            {
+                logs.ReportError("Erroneous ConfigServerConnectAttempts value, must be greater than or equal to 0.");
+                return false;
+            }
+            initialConfigServerConnectAttempts = (uint)value;
+
 
             // 1. Connect with ConfigServer
-            if (!ConnectWithConfigServer(1000))
+            if (!ConnectWithConfigServer(initialConfigServerConnectAttempts))
             {
                 return false;
             }
@@ -61,7 +73,7 @@ namespace MatchingServer_CSharp.Classes
 
             while (!result)     // If registration failed (socket issue, reattempt)
             {
-                if (!ConnectWithConfigServer(1000))
+                if (!ConnectWithConfigServer(initialConfigServerConnectAttempts))
                 {
                     return false;
                 }
@@ -236,7 +248,7 @@ namespace MatchingServer_CSharp.Classes
         /// </summary>
         async Task ConfigServerLoop ()
         {
-            byte[] message = new byte[100];
+            byte[] message = new byte[ConfigReader.FixedMessageSize];
             if(!(await connectionManager.ReceiveMessageFromConfigServerAsync(message))) {
                 // Error with connection
                 logs.ReportError("ServerManager.ConfigServerLoop: Attempting to reset connection with ConfigServer. . .");
@@ -389,7 +401,7 @@ namespace MatchingServer_CSharp.Classes
 
 
                 // 2. Send the local MS ID to the peer MS
-                byte[] message = new byte[100];
+                byte[] message = new byte[ConfigReader.FixedMessageSize];
                 messageProcessor.PackMessage(
                         new Header(0, TerminalType.MatchingServer, LocalMatchingServerIDCode, TerminalType.MatchingServer, 0),
                         Command.MatchingServerIDTransmit,
@@ -429,7 +441,7 @@ namespace MatchingServer_CSharp.Classes
         /// </summary>
         async private Task MatchingServerAcceptingLoop ()
         {
-            byte[] message = new byte[100];
+            byte[] message = new byte[ConfigReader.FixedMessageSize];
             if (!await connectionManager.AcceptMatchingServerConnectionAsync(message))
             {
                 // An accept call or first messsage received failed
@@ -460,7 +472,7 @@ namespace MatchingServer_CSharp.Classes
 
                 // 2. Send verification message to ConfigServer
                 logs.ReportMessage("ServerManager.VerifyNewMatchingServer: Verifying MS #" + peerMatchingServerID + " with ConfigServer.");
-                byte[] verificationMessage = new byte[100];
+                byte[] verificationMessage = new byte[ConfigReader.FixedMessageSize];
                 messageProcessor.PackMessage(
                             new Header(0, TerminalType.MatchingServer, LocalMatchingServerIDCode, TerminalType.ConfigServer, 0),
                             Command.MatchingServerIDVerify,
@@ -483,7 +495,7 @@ namespace MatchingServer_CSharp.Classes
         /// <param name="matchingServerID">A string identifier for the MatchingServer.</param>
         async Task MatchingServerLoop(string matchingServerID)
         {
-            byte[] message = new byte[100];
+            byte[] message = new byte[ConfigReader.FixedMessageSize];
             if (!(await connectionManager.ReceiveMessageFromMatchingServerAsync(matchingServerID, message)))
             {
                 // Error with connection - end loop

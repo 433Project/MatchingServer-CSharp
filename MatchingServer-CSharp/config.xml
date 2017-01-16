@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ConfigInformation>
+  <GeneralSettings>
+    <ConfigServerConnectAttempts value ="1000" />
+    <FixedMessageSize value ="100" />
+  </GeneralSettings>
+  <MatchingSettings>
+  </MatchingSettings>
+</ConfigInformation>

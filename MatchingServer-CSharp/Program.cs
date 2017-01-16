@@ -14,6 +14,7 @@ namespace MatchingServer_CSharp
             ServerManager serverManager = new ServerManager();
 
             ConfigReader.Initialize();
+            ConfigReader.SetFixedMessageSizeFromFile();
 
             serverManager.Initialize();
 

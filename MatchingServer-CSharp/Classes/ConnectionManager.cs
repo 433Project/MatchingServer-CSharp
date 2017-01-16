@@ -289,7 +289,7 @@ namespace MatchingServer_CSharp.Classes
             Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ReceiveMessageFromConfigServerSync.");
             Debug.Assert(configServerSocket != null, "Cannot call ReceiveMessageFromConfigServerSync if configServerSocket is null!");
 
-            message = new byte[100];
+            message = new byte[ConfigReader.FixedMessageSize];
 
             try
             {
@@ -330,7 +330,7 @@ namespace MatchingServer_CSharp.Classes
             Debug.Assert(IsInitialized, "ConnectionManager not initialized. Cannot call ReceiveMessageFromConfigServerSync.");
             Debug.Assert(configServerSocket != null, "Cannot call ReceiveMessageFromConfigServerSync if configServerSocket is null!");
 
-            //message = new byte[100];
+            //message = new byte[ConfigReader.FixedMessageSize];
             int bytesReceived = 0;
 
             bytesReceived = await Task.Run(() =>
@@ -648,7 +648,7 @@ namespace MatchingServer_CSharp.Classes
                 return false;
             }
 
-            //message = new byte[100];
+            //message = new byte[ConfigReader.FixedMessageSize];
             int bytesReceived = 0;
 
             bytesReceived = await Task.Run(() =>

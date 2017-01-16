@@ -19,6 +19,7 @@ namespace MatchingServer_CSharp.Classes
 
         //Properties
         public bool IsInitialized { get; private set; } = false;
+        public static int FixedMessageSize { get; private set; } = 0;
 
 
 
@@ -103,6 +104,12 @@ namespace MatchingServer_CSharp.Classes
         }
 
 
+        /// <summary>
+        /// This method retrieves the port number of a connection entry in the network.xml configuration file.
+        /// </summary>
+        /// <param name="xmlNodeName">The name of the connection node (ConfigServer, ConnectionServer).</param>
+        /// <param name="portNumber">An out parameter that holds the port number contained in the configuration file.</param>
+        /// <returns>Returns true upon a successful read and false if the data could not be obtained.</returns>
         public static bool GetPort (string xmlNodeName, out int portNumber)
         {
             portNumber = 8765;
@@ -149,6 +156,72 @@ namespace MatchingServer_CSharp.Classes
         }
 
 
+        /// <summary>
+        /// This method using an XmlTextReader to retrieve a specified value from config.xml.
+        /// </summary>
+        /// <param name="xmlNodeName">The name of the settings value under the "GeneralSettings" node (ConfigServerConnectAttempts, FixedMessageSize).</param>
+        /// <param name="numericalValue">An out parameter to hold the integer value stored in the XML file.</param>
+        /// <returns>Returns true upon successful retrieval and false on error.</returns>
+        public static bool GetSettingsIntValue(string xmlNodeName, out int numericalValue)
+        {
+            numericalValue = -1;
+            XmlTextReader xmlTextReader = null;
+
+            try
+            {
+                xmlTextReader = new XmlTextReader("config.xml");
+
+                if (!xmlTextReader.ReadToFollowing("GeneralSettings"))
+                {
+                    logs.ReportError("GetSettingsIntValue cannot find node <GeneralSettings>");
+                    return false;
+                }
+                if (!xmlTextReader.ReadToDescendant(xmlNodeName))
+                {
+                    logs.ReportError("GetSettingsIntValue cannot find node <" + xmlNodeName + ">");
+                    return false;
+                }
+                if (!int.TryParse(xmlTextReader.GetAttribute("value"), out numericalValue))
+                {
+                    logs.ReportError("GetSettingsIntValue cannot parse numerical value within node <" + xmlNodeName + ">");
+                    return false;
+                }
+            }
+            catch (FileNotFoundException e)
+            {
+                logs.ReportError("GetSettingsIntValue cannot find XML-file ...\\config.xml");
+                return false;
+            }
+            catch (XmlException e)
+            {
+                logs.ReportError("GetSettingsIntValue: " + e.Message);
+                return false;
+            }
+            catch (Exception e)
+            {
+                logs.ReportError("GetSettingsIntValue: " + e.Message);
+                return false;
+            }
+
+            return true;
+        }
+
+
+        /// <summary>
+        /// This method loads the FixedMessageSize from the config.xml file, under the GeneralSettings node.
+        /// </summary>
+        /// <returns>Returns true if a value was successfully obtained or false otherwise.</returns>
+        public static bool SetFixedMessageSizeFromFile ()
+        {
+            int size;
+            if (!GetSettingsIntValue("FixedMessageSize", out size))
+            {
+                return false;
+            }
+            FixedMessageSize = size;
+            logs.ReportMessage("FixedMessageSize set to " + FixedMessageSize);
+            return true;
+        }
 
         //###########################################
         //              Private Methods
