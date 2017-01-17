@@ -19,6 +19,7 @@ namespace MatchingServer_CSharp.Classes
         private Logs logs;
         private ConnectionManager connectionManager;
         private static MessageProcessor messageProcessor;
+        private static WaitingRoom waitingRoom;
         private uint initialConfigServerConnectAttempts;
 
         //Properties
@@ -79,6 +80,11 @@ namespace MatchingServer_CSharp.Classes
                 }
                 result = GetIDFromConfigServer();
             }
+
+
+            // 3. Create WaitingRoom
+            waitingRoom = new WaitingRoom();
+            waitingRoom.Initialize(LocalMatchingServerIDCode);
 
 
             // 3. Create ConfigServer async service loop
@@ -336,8 +342,10 @@ namespace MatchingServer_CSharp.Classes
                        {
                            if (antecedent.Result)
                            {
-                                // B. Start MatchingServer receive loop for that server
-
+                               // B. Start MatchingServer receive loop for that server
+                               float latency = CalculateLatency();
+                               waitingRoom.AddMStoWaitingRoom(peerMatchingServerCode, latency);
+                               MatchingServerLoop(packet.body.Data1);
                             }
                        });
                     verifiedMatchingServer.Start();
@@ -391,6 +399,12 @@ namespace MatchingServer_CSharp.Classes
         /// <param name="ip">The IP address of the peer MatchingServer.</param>
         private void StartMatchingServerConnection (string matchingServerID, string ip)
         {
+            int peerIDCode;
+            if (!(int.TryParse (matchingServerID, out peerIDCode)))
+            {
+                peerIDCode = -2;
+            }
+
             Task.Run(async () =>
             {
                 // 1. Attempt to make a connection
@@ -403,7 +417,7 @@ namespace MatchingServer_CSharp.Classes
                 // 2. Send the local MS ID to the peer MS
                 byte[] message = new byte[ConfigReader.FixedMessageSize];
                 messageProcessor.PackMessage(
-                        new Header(0, TerminalType.MatchingServer, LocalMatchingServerIDCode, TerminalType.MatchingServer, 0),
+                        new Header(0, TerminalType.MatchingServer, LocalMatchingServerIDCode, TerminalType.MatchingServer, peerIDCode),
                         Command.MatchingServerIDTransmit,
                         Status.None,
                         "",
@@ -412,7 +426,9 @@ namespace MatchingServer_CSharp.Classes
                 await connectionManager.SendMessageToMatchingServerAsync(matchingServerID, message);
 
 
-                // 3. Start a Async MS Receive loop
+                // 3. Create a Server Entry in the WaitingRoom and Start a Async MS Receive loop
+                float latency = CalculateLatency();
+                waitingRoom.AddMStoWaitingRoom(peerIDCode, latency);
                 MatchingServerLoop(matchingServerID);
             });
         }
@@ -532,8 +548,9 @@ namespace MatchingServer_CSharp.Classes
                     logs.ReportMessage("MatchingServerLoop: Received MatchingServerIDTransmitResponse from MatchingServer: ID: " + packet.header.srcCode + " Status: " + packet.body.status);
                     if (packet.body.status != Status.Success)
                     {
-                        logs.ReportError("MatchingServerLoop: Peer MatchingServer #" + packet.body.Data1 + " denied verification. Closing connection. . .");
-                        connectionManager.DisconnectMatchingServer(packet.body.Data1);
+                        logs.ReportError("MatchingServerLoop: Peer MatchingServer #" + packet.header.srcCode + " denied verification. Closing connection. . .");
+                        waitingRoom.RemovePeerMSfromWaitingRoom(packet.header.srcCode);
+                        connectionManager.DisconnectMatchingServer(packet.header.srcCode.ToString());
                     }
                     break;
 
@@ -552,7 +569,20 @@ namespace MatchingServer_CSharp.Classes
         /// <returns>Returns a float value representing the latency value of the connection with a MatchingServer.</returns>
         private float CalculateLatency ()
         {
-            return -1f;
+            Random random = new Random();
+            float distributionFactor = (float)random.NextDouble ();
+            if (distributionFactor >= 0.75f)
+            {
+                distributionFactor = 1f;
+            }
+            else
+            {
+                distributionFactor = 0.2f;
+            }
+
+            float latency = (float)random.NextDouble();
+            latency = latency * distributionFactor;
+            return latency;
         }
     }
 }
